@@ -1,6 +1,228 @@
 <!DOCTYPE html>
-<html>
-<body style="background:black;color:white;">
-<h1>からあげ歌詞ビューア</h1>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lyrics Prompter</title>
+
+<style>
+html,body{
+    margin:0;
+    width:100%;
+    height:100%;
+    background:#000;
+    color:#fff;
+    font-family:sans-serif;
+}
+
+#search{
+    position:fixed;
+    top:0;
+    left:0;
+    right:0;
+    background:#111;
+    padding:10px;
+    z-index:100;
+}
+
+input{
+    font-size:18px;
+    padding:8px;
+}
+
+button{
+    font-size:18px;
+    padding:8px 12px;
+}
+
+#results{
+    margin-top:70px;
+    padding:10px;
+}
+
+.result{
+    border:1px solid #333;
+    padding:10px;
+    margin-bottom:10px;
+    cursor:pointer;
+}
+
+.result:hover{
+    background:#222;
+}
+
+#viewer{
+    display:none;
+    height:100vh;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    text-align:center;
+}
+
+.prev{
+    font-size:42px;
+    opacity:.3;
+}
+
+.current{
+    font-size:90px;
+    font-weight:bold;
+    margin:30px;
+}
+
+.next{
+    font-size:42px;
+    opacity:.6;
+}
+
+#toolbar{
+    position:fixed;
+    bottom:10px;
+    left:50%;
+    transform:translateX(-50%);
+    background:#111;
+    padding:10px;
+}
+</style>
+</head>
+<body>
+
+<div id="search">
+    <input id="artist" placeholder="アーティスト">
+    <input id="title" placeholder="曲名">
+    <button onclick="search()">検索</button>
+</div>
+
+<div id="results"></div>
+
+<div id="viewer">
+    <div class="prev" id="prev"></div>
+    <div class="current" id="current"></div>
+    <div class="next" id="next"></div>
+</div>
+
+<div id="toolbar" style="display:none">
+    ← →
+    <button onclick="fullscreen()">全画面</button>
+</div>
+
+<script>
+
+let currentLyrics=[];
+let index=0;
+
+function search(){
+
+    const artist =
+        document.getElementById("artist").value;
+
+    const title =
+        document.getElementById("title").value;
+
+    const results=document.getElementById("results");
+
+    results.innerHTML="検索中...";
+
+    /*
+      後でLRCLibやYouTube検索へ差し替える
+    */
+
+    setTimeout(()=>{
+
+        const demo=[
+            {
+                source:"LRC Source",
+                lyrics:[
+                    "前奏",
+                    "私は",
+                    "からあげになっている",
+                    "途中です",
+                    "なぜだとおもう？"
+                ]
+            },
+            {
+                source:"YouTube Subtitle",
+                lyrics:[
+                    "イントロ",
+                    "こんにちは",
+                    "世界",
+                    "歌います"
+                ]
+            }
+        ];
+
+        results.innerHTML="";
+
+        demo.forEach(song=>{
+
+            const div=document.createElement("div");
+
+            div.className="result";
+
+            div.innerHTML=
+            `<b>${artist} ${title}</b><br>${song.source}`;
+
+            div.onclick=()=>loadLyrics(song.lyrics);
+
+            results.appendChild(div);
+        });
+
+    },500);
+}
+
+function loadLyrics(lyrics){
+
+    currentLyrics=lyrics;
+    index=0;
+
+    document.getElementById("search").style.display="none";
+    document.getElementById("results").style.display="none";
+
+    document.getElementById("viewer").style.display="flex";
+    document.getElementById("toolbar").style.display="block";
+
+    render();
+}
+
+function render(){
+
+    document.getElementById("prev").textContent=
+        currentLyrics[index-1] || "";
+
+    document.getElementById("current").textContent=
+        currentLyrics[index] || "";
+
+    document.getElementById("next").textContent=
+        currentLyrics[index+1] || "";
+}
+
+document.addEventListener("keydown",e=>{
+
+    if(e.key==="ArrowRight"){
+
+        index=Math.min(
+            currentLyrics.length-1,
+            index+1
+        );
+
+        render();
+    }
+
+    if(e.key==="ArrowLeft"){
+
+        index=Math.max(0,index-1);
+
+        render();
+    }
+});
+
+function fullscreen(){
+
+    document.documentElement.requestFullscreen();
+}
+
+</script>
+
 </body>
 </html>
