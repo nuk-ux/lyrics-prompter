@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Lyrics Prompter</title>
 
@@ -15,212 +15,261 @@ html,body{
     font-family:sans-serif;
 }
 
-#search{
-    position:fixed;
-    top:0;
-    left:0;
-    right:0;
-    background:#111;
-    padding:10px;
-    z-index:100;
+.hidden{
+    display:none !important;
 }
 
-input{
-    font-size:18px;
-    padding:8px;
+#searchPage{
+    padding:20px;
 }
 
-button{
-    font-size:18px;
-    padding:8px 12px;
+#searchBox{
+    width:100%;
+    max-width:700px;
+    font-size:24px;
+    padding:12px;
+    box-sizing:border-box;
 }
 
 #results{
-    margin-top:70px;
-    padding:10px;
+    margin-top:20px;
 }
 
 .result{
     border:1px solid #333;
-    padding:10px;
+    padding:15px;
     margin-bottom:10px;
     cursor:pointer;
 }
 
 .result:hover{
-    background:#222;
+    background:#111;
 }
 
 #viewer{
-    display:none;
     height:100vh;
+    display:flex;
     flex-direction:column;
     justify-content:center;
     align-items:center;
     text-align:center;
+    padding:30px;
+    box-sizing:border-box;
 }
 
-.prev{
-    font-size:42px;
-    opacity:.3;
+#future1{
+    font-size:56px;
+    opacity:.9;
 }
 
-.current{
-    font-size:90px;
+#current{
+    font-size:92px;
     font-weight:bold;
-    margin:30px;
+    margin:40px 0;
 }
 
-.next{
+#future2{
     font-size:42px;
     opacity:.6;
 }
 
-#toolbar{
+#status{
     position:fixed;
     bottom:10px;
-    left:50%;
-    transform:translateX(-50%);
-    background:#111;
-    padding:10px;
+    left:10px;
+    font-size:14px;
+    opacity:.6;
 }
 </style>
 </head>
 <body>
 
-<div id="search">
-    <input id="artist" placeholder="アーティスト">
-    <input id="title" placeholder="曲名">
-    <button onclick="search()">検索</button>
+<div id="searchPage">
+
+    <h2>歌詞プロンプター</h2>
+
+    <input
+        id="searchBox"
+        placeholder="アーティスト名・曲名"
+    >
+
+    <div id="results"></div>
+
 </div>
 
-<div id="results"></div>
+<div id="viewer" class="hidden">
 
-<div id="viewer">
-    <div class="prev" id="prev"></div>
-    <div class="current" id="current"></div>
-    <div class="next" id="next"></div>
+    <div id="future1"></div>
+
+    <div id="current"></div>
+
+    <div id="future2"></div>
+
 </div>
 
-<div id="toolbar" style="display:none">
-    ← →
-    <button onclick="fullscreen()">全画面</button>
+<div id="status">
+F:全画面 / S:検索へ戻る / ←→:送り
 </div>
 
 <script>
 
-let currentLyrics=[];
-let index=0;
+const searchBox = document.getElementById("searchBox");
+const results = document.getElementById("results");
 
-function search(){
+const searchPage = document.getElementById("searchPage");
+const viewer = document.getElementById("viewer");
 
-    const artist =
-        document.getElementById("artist").value;
+let lyrics = [];
+let index = 0;
 
-    const title =
-        document.getElementById("title").value;
+searchBox.addEventListener("input", async () => {
 
-    const results=document.getElementById("results");
+    const q = searchBox.value.trim();
 
-    results.innerHTML="検索中...";
+    if(q.length < 2){
+        results.innerHTML = "";
+        return;
+    }
 
     /*
-      後でLRCLibやYouTube検索へ差し替える
+      本来ここでAPI検索
+
+      例:
+      MusicBrainz
+      iTunes Search
+      etc
     */
 
-    setTimeout(()=>{
+    const demo = [
+        {
+            type:"artist",
+            name:"Ado"
+        },
+        {
+            type:"track",
+            name:"唱"
+        },
+        {
+            type:"track",
+            name:"新時代"
+        }
+    ];
 
-        const demo=[
-            {
-                source:"LRC Source",
-                lyrics:[
-                    "前奏",
-                    "私は",
-                    "からあげになっている",
-                    "途中です",
-                    "なぜだとおもう？"
-                ]
-            },
-            {
-                source:"YouTube Subtitle",
-                lyrics:[
-                    "イントロ",
-                    "こんにちは",
-                    "世界",
-                    "歌います"
-                ]
-            }
-        ];
+    results.innerHTML = "";
 
-        results.innerHTML="";
+    demo.forEach(item=>{
 
-        demo.forEach(song=>{
+        const div=document.createElement("div");
 
-            const div=document.createElement("div");
+        div.className="result";
 
-            div.className="result";
+        div.innerHTML=`
+            <b>${item.name}</b><br>
+            ${item.type}
+        `;
 
-            div.innerHTML=
-            `<b>${artist} ${title}</b><br>${song.source}`;
+        div.onclick=()=>selectItem(item);
 
-            div.onclick=()=>loadLyrics(song.lyrics);
+        results.appendChild(div);
 
-            results.appendChild(div);
-        });
+    });
 
-    },500);
+});
+
+function selectItem(item){
+
+    /*
+      本来ここで
+
+      LRCLib
+      GitHub LRC
+      YouTube字幕
+
+      を検索する
+    */
+
+    lyrics = [
+
+        "私は",
+        "からあげになっている",
+        "途中です",
+        "なぜだとおもう？",
+        "ここがお前の運命だ",
+        "死ぬか",
+        "推すか選べ"
+
+    ];
+
+    index = 0;
+
+    showViewer();
 }
 
-function loadLyrics(lyrics){
+function showViewer(){
 
-    currentLyrics=lyrics;
-    index=0;
+    searchPage.classList.add("hidden");
+    viewer.classList.remove("hidden");
 
-    document.getElementById("search").style.display="none";
-    document.getElementById("results").style.display="none";
-
-    document.getElementById("viewer").style.display="flex";
-    document.getElementById("toolbar").style.display="block";
-
-    render();
+    renderLyrics();
 }
 
-function render(){
+function backToSearch(){
 
-    document.getElementById("prev").textContent=
-        currentLyrics[index-1] || "";
-
-    document.getElementById("current").textContent=
-        currentLyrics[index] || "";
-
-    document.getElementById("next").textContent=
-        currentLyrics[index+1] || "";
+    viewer.classList.add("hidden");
+    searchPage.classList.remove("hidden");
 }
 
-document.addEventListener("keydown",e=>{
+function renderLyrics(){
+
+    document.getElementById("current").textContent =
+        lyrics[index] || "";
+
+    document.getElementById("future1").textContent =
+        lyrics[index+1] || "";
+
+    document.getElementById("future2").textContent =
+        lyrics[index+2] || "";
+}
+
+document.addEventListener("keydown",(e)=>{
 
     if(e.key==="ArrowRight"){
 
         index=Math.min(
-            currentLyrics.length-1,
+            lyrics.length-1,
             index+1
         );
 
-        render();
+        renderLyrics();
     }
 
     if(e.key==="ArrowLeft"){
 
-        index=Math.max(0,index-1);
+        index=Math.max(
+            0,
+            index-1
+        );
 
-        render();
+        renderLyrics();
+    }
+
+    if(e.key==="s" || e.key==="S"){
+
+        backToSearch();
+    }
+
+    if(e.key==="f" || e.key==="F"){
+
+        if(!document.fullscreenElement){
+
+            document.documentElement.requestFullscreen();
+
+        }else{
+
+            document.exitFullscreen();
+        }
     }
 });
-
-function fullscreen(){
-
-    document.documentElement.requestFullscreen();
-}
 
 </script>
 
