@@ -35,7 +35,6 @@ body{
 .result:hover{ background:#111; }
 .artist{ opacity:.7; }
 
-/* player */
 .player{
     width:100%;
     max-width:480px;
@@ -48,7 +47,6 @@ body{
     margin-top:30px;
 }
 
-/* controls（常駐） */
 #controls{
     position:fixed;
     bottom:10px;
@@ -80,14 +78,12 @@ button:hover{ background:#222; }
 
 <body>
 
-<!-- TOP -->
 <div id="topScreen" class="screen active">
     <h1>Lyrics Prompter Laule'a</h1>
     <input id="search" placeholder="曲名 / アーティスト">
     <div id="results"></div>
 </div>
 
-<!-- PLAYER -->
 <div id="playerScreen" class="screen">
 
     <div class="topbar">
@@ -98,7 +94,6 @@ button:hover{ background:#222; }
     <div id="lyrics"></div>
 </div>
 
-<!-- controls（常駐） -->
 <div id="controls"></div>
 
 <script>
@@ -142,7 +137,7 @@ window.onYouTubeIframeAPIReady = () => {
 };
 
 /* =========================
-   SEARCH
+   SEARCH (iTunes)
 ========================= */
 searchBox.addEventListener("input",()=>{
 
@@ -157,15 +152,33 @@ searchBox.addEventListener("input",()=>{
     timer = setTimeout(()=>search(q),300);
 });
 
+function score(track){
+
+    let s = 0;
+
+    if(/[ぁ-んァ-ン一-龥]/.test(track.trackName)) s += 2;
+    if(/[ぁ-んァ-ン一-龥]/.test(track.artistName)) s += 2;
+
+    if(/jpop|j-pop|anime|歌|cover/i.test(track.trackName)) s += 1;
+
+    return s;
+}
+
 async function search(q){
 
     results.innerHTML = "検索中...";
 
-    const res = await fetch(
-        `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=20`
-    );
+    const url =
+        "https://itunes.apple.com/search"
+        + "?term=" + encodeURIComponent(q)
+        + "&entity=song"
+        + "&country=JP"
+        + "&limit=30";
 
+    const res = await fetch(url);
     const data = await res.json();
+
+    data.results.sort((a,b)=>score(b)-score(a));
 
     results.innerHTML = "";
 
@@ -263,7 +276,8 @@ function buildPlayer(){
 
     wrap.appendChild(div);
 
-    const id = getYoutubeId(prompt("YouTube URL"));
+    const url = prompt("YouTube URL");
+    const id = getYoutubeId(url);
 
     if(state.player){
         state.player.destroy();
@@ -287,7 +301,7 @@ function buildPlayer(){
 }
 
 /* =========================
-   CONTROLS（常駐）
+   CONTROLS
 ========================= */
 function buildControls(){
 
@@ -298,6 +312,7 @@ function buildControls(){
         <button id="speedUp">+speed</button>
         <button id="offsetDown">-offset</button>
         <button id="offsetUp">+offset</button>
+        <button id="sync">sync</button>
         <button id="reset">reset</button>
         <button id="fs">fullscreen</button>
     `;
@@ -307,6 +322,12 @@ function buildControls(){
 
     document.getElementById("offsetUp").onclick = ()=> state.offset += 0.1;
     document.getElementById("offsetDown").onclick = ()=> state.offset -= 0.1;
+
+    document.getElementById("sync").onclick = ()=>{
+        const t = state.player.getCurrentTime();
+        const lt = state.lines[state.index]?.time || 0;
+        state.offset = lt - t;
+    };
 
     document.getElementById("reset").onclick = ()=>{
         state.index = 0;
@@ -324,7 +345,7 @@ function buildControls(){
 }
 
 /* =========================
-   SYNC
+   SYNC LOOP
 ========================= */
 function startSync(){
 
@@ -361,7 +382,7 @@ function render(){
     document.getElementById("lyrics").innerHTML = `
         <div style="font-size:36px;opacity:.5">${l[i-1]?.text||""}</div>
         <div style="font-size:70px;margin:20px 0;font-weight:bold">${l[i]?.text||""}</div>
-        <div style="font-size:36px;opacity:.75">${l[i+1]?.text||""}</div>
+        <div style="font-size:36px;opacity:.8">${l[i+1]?.text||""}</div>
     `;
 }
 
@@ -385,7 +406,9 @@ document.getElementById("backBtn").onclick = ()=>{
    UTIL
 ========================= */
 function getYoutubeId(url){
+
     if(!url) return "";
+
     const m = url.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([a-zA-Z0-9_-]{11})/);
     return m ? m[1] : "";
 }
