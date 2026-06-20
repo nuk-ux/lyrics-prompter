@@ -1,44 +1,37 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
 <title>Lyrics Prompter</title>
 
 <style>
-html,body{
+
+body{
     margin:0;
-    width:100%;
-    height:100%;
     background:#000;
     color:#fff;
     font-family:sans-serif;
 }
 
-.hidden{
-    display:none !important;
-}
-
-#searchPage{
+#app{
+    max-width:900px;
+    margin:auto;
     padding:20px;
 }
 
-#searchBox{
+#search{
     width:100%;
-    max-width:700px;
     font-size:24px;
     padding:12px;
     box-sizing:border-box;
 }
 
-#results{
-    margin-top:20px;
-}
-
 .result{
-    border:1px solid #333;
     padding:15px;
-    margin-bottom:10px;
+    border:1px solid #333;
+    margin-top:10px;
     cursor:pointer;
 }
 
@@ -46,230 +39,141 @@ html,body{
     background:#111;
 }
 
-#viewer{
-    height:100vh;
-    display:flex;
-    flex-direction:column;
-    justify-content:center;
-    align-items:center;
-    text-align:center;
-    padding:30px;
-    box-sizing:border-box;
+.artist{
+    opacity:.7;
 }
 
-#future1{
-    font-size:56px;
-    opacity:.9;
-}
-
-#current{
-    font-size:92px;
-    font-weight:bold;
-    margin:40px 0;
-}
-
-#future2{
-    font-size:42px;
-    opacity:.6;
-}
-
-#status{
-    position:fixed;
-    bottom:10px;
-    left:10px;
-    font-size:14px;
-    opacity:.6;
-}
 </style>
 </head>
 <body>
 
-<div id="searchPage">
+<div id="app">
 
-    <h2>歌詞プロンプター</h2>
+    <h1>Lyrics Prompter</h1>
 
     <input
-        id="searchBox"
-        placeholder="アーティスト名・曲名"
+        id="search"
+        placeholder="曲名またはアーティスト"
     >
 
     <div id="results"></div>
 
 </div>
 
-<div id="viewer" class="hidden">
-
-    <div id="future1"></div>
-
-    <div id="current"></div>
-
-    <div id="future2"></div>
-
-</div>
-
-<div id="status">
-F:全画面 / S:検索へ戻る / ←→:送り
-</div>
-
 <script>
 
-const searchBox = document.getElementById("searchBox");
-const results = document.getElementById("results");
+const searchBox =
+document.getElementById("search");
 
-const searchPage = document.getElementById("searchPage");
-const viewer = document.getElementById("viewer");
+const results =
+document.getElementById("results");
 
-let lyrics = [];
-let index = 0;
+let timer;
 
-searchBox.addEventListener("input", async () => {
+searchBox.addEventListener("input",()=>{
 
-    const q = searchBox.value.trim();
+    clearTimeout(timer);
+
+    const q =
+    searchBox.value.trim();
 
     if(q.length < 2){
+
         results.innerHTML = "";
+
         return;
     }
 
-    /*
-      本来ここでAPI検索
+    timer =
+    setTimeout(()=>{
 
-      例:
-      MusicBrainz
-      iTunes Search
-      etc
-    */
+        searchSongs(q);
 
-    const demo = [
-        {
-            type:"artist",
-            name:"Ado"
-        },
-        {
-            type:"track",
-            name:"唱"
-        },
-        {
-            type:"track",
-            name:"新時代"
-        }
-    ];
-
-    results.innerHTML = "";
-
-    demo.forEach(item=>{
-
-        const div=document.createElement("div");
-
-        div.className="result";
-
-        div.innerHTML=`
-            <b>${item.name}</b><br>
-            ${item.type}
-        `;
-
-        div.onclick=()=>selectItem(item);
-
-        results.appendChild(div);
-
-    });
+    },300);
 
 });
 
-function selectItem(item){
+async function searchSongs(q){
 
-    /*
-      本来ここで
+    results.innerHTML =
+    "検索中...";
 
-      LRCLib
-      GitHub LRC
-      YouTube字幕
+    try{
 
-      を検索する
-    */
+        const url =
+        "https://itunes.apple.com/search"
+        + "?term="
+        + encodeURIComponent(q)
+        + "&entity=song"
+        + "&limit=30";
 
-    lyrics = [
+        const res =
+        await fetch(url);
 
-        "私は",
-        "からあげになっている",
-        "途中です",
-        "なぜだとおもう？",
-        "ここがお前の運命だ",
-        "死ぬか",
-        "推すか選べ"
+        const data =
+        await res.json();
 
-    ];
+        results.innerHTML = "";
 
-    index = 0;
+        if(!data.results.length){
 
-    showViewer();
-}
+            results.innerHTML =
+            "候補なし";
 
-function showViewer(){
-
-    searchPage.classList.add("hidden");
-    viewer.classList.remove("hidden");
-
-    renderLyrics();
-}
-
-function backToSearch(){
-
-    viewer.classList.add("hidden");
-    searchPage.classList.remove("hidden");
-}
-
-function renderLyrics(){
-
-    document.getElementById("current").textContent =
-        lyrics[index] || "";
-
-    document.getElementById("future1").textContent =
-        lyrics[index+1] || "";
-
-    document.getElementById("future2").textContent =
-        lyrics[index+2] || "";
-}
-
-document.addEventListener("keydown",(e)=>{
-
-    if(e.key==="ArrowRight"){
-
-        index=Math.min(
-            lyrics.length-1,
-            index+1
-        );
-
-        renderLyrics();
-    }
-
-    if(e.key==="ArrowLeft"){
-
-        index=Math.max(
-            0,
-            index-1
-        );
-
-        renderLyrics();
-    }
-
-    if(e.key==="s" || e.key==="S"){
-
-        backToSearch();
-    }
-
-    if(e.key==="f" || e.key==="F"){
-
-        if(!document.fullscreenElement){
-
-            document.documentElement.requestFullscreen();
-
-        }else{
-
-            document.exitFullscreen();
+            return;
         }
+
+        data.results.forEach(track=>{
+
+            const div =
+            document.createElement("div");
+
+            div.className =
+            "result";
+
+            div.innerHTML = `
+                <div>
+                    ${track.trackName}
+                </div>
+
+                <div class="artist">
+                    ${track.artistName}
+                </div>
+            `;
+
+            div.onclick = ()=>{
+
+                selectTrack(track);
+
+            };
+
+            results.appendChild(div);
+
+        });
+
     }
-});
+    catch(err){
+
+        console.error(err);
+
+        results.innerHTML =
+        "検索失敗";
+
+    }
+
+}
+
+function selectTrack(track){
+
+    console.log(track);
+
+    alert(
+        track.artistName
+        + "\n"
+        + track.trackName
+    );
+
+}
 
 </script>
 
