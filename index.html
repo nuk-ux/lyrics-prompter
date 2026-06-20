@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lyrics Prompter STABLE</title>
+<title>Lyrics Prompter FINAL UI</title>
 
 <script src="https://www.youtube.com/iframe_api"></script>
 
@@ -44,40 +44,29 @@ body{
     text-align:center;
     margin-top:40px;
 }
+
+.controls{
+    position:fixed;
+    bottom:10px;
+    left:10px;
+    color:#0f0;
+    font-size:12px;
+    opacity:0.8;
+}
 </style>
 </head>
 
 <body>
 
 <div id="app">
-    <h1>Lyrics Prompter STABLE</h1>
+    <h1>Lyrics Prompter</h1>
     <input id="search" placeholder="曲名 / アーティスト">
     <div id="results"></div>
 </div>
 
+<div class="controls" id="hud"></div>
+
 <script>
-
-/* =========================
-   DEBUG HUD
-========================= */
-const debug = document.createElement("div");
-debug.style = `
-position:fixed;
-bottom:10px;
-right:10px;
-background:#000;
-color:#0f0;
-font-size:12px;
-padding:8px;
-z-index:99999;
-white-space:pre;
-max-width:300px;
-`;
-document.body.appendChild(debug);
-
-function log(msg){
-    debug.innerText = msg;
-}
 
 /* =========================
    STATE
@@ -86,28 +75,38 @@ const state = {
     player: null,
     lines: [],
     index: 0,
-    mode: "auto",
     offset: 0,
+    speed: 1.0,
     ytReady: false,
     syncStarted: false
 };
 
-/* =========================
-   YOUTUBE API READY
-========================= */
-window.onYouTubeIframeAPIReady = () => {
-    state.ytReady = true;
-    log("YT API READY");
-};
-
-/* =========================
-   SEARCH
-========================= */
 const searchBox = document.getElementById("search");
 const results = document.getElementById("results");
+const hud = document.getElementById("hud");
 
 let timer;
 
+/* =========================
+   HUD
+========================= */
+function log(){
+    hud.innerText =
+`speed: ${state.speed.toFixed(1)}
+offset: ${state.offset.toFixed(2)}
+index: ${state.index}`;
+}
+
+/* =========================
+   YOUTUBE READY
+========================= */
+window.onYouTubeIframeAPIReady = () => {
+    state.ytReady = true;
+};
+
+/* =========================
+   SEARCH iTunes
+========================= */
 searchBox.addEventListener("input",()=>{
 
     clearTimeout(timer);
@@ -122,8 +121,6 @@ searchBox.addEventListener("input",()=>{
 });
 
 async function search(q){
-
-    log("searching...");
 
     results.innerHTML = "検索中...";
 
@@ -149,16 +146,12 @@ async function search(q){
 
         results.appendChild(div);
     });
-
-    log("search done");
 }
 
 /* =========================
    LYRICS
 ========================= */
 async function fetchLyrics(track){
-
-    log("fetch lyrics...");
 
     results.innerHTML = "歌詞取得中...";
 
@@ -184,8 +177,6 @@ async function fetchLyrics(track){
 
         results.appendChild(div);
     });
-
-    log("lyrics loaded");
 }
 
 /* =========================
@@ -211,8 +202,6 @@ function parseLRC(lrc){
 ========================= */
 function start(item){
 
-    log("session start");
-
     if(item.syncedLyrics){
         state.lines = parseLRC(item.syncedLyrics);
     }else{
@@ -226,30 +215,7 @@ function start(item){
 }
 
 /* =========================
-   WAIT YT SAFE
-========================= */
-function waitYT(callback){
-
-    log("waiting YT...");
-
-    const timer = setInterval(()=>{
-
-        if(state.ytReady && window.YT && YT.Player){
-
-            clearInterval(timer);
-            log("YT CONFIRMED");
-
-            callback();
-
-        }else{
-            log("loading YT...");
-        }
-
-    },200);
-}
-
-/* =========================
-   UI + PLAYER
+   UI
 ========================= */
 function showPlayer(){
 
@@ -267,36 +233,24 @@ function showPlayer(){
 
     state.lyricsDiv = lyricsDiv;
 
-    const url = prompt("YouTube URL（空でもOK）");
+    const url = prompt("YouTube URL（空OK）");
     const id = getYoutubeId(url);
 
-    log("init...");
+    if(id && state.ytReady){
 
-    waitYT(()=>{
+        state.player = new YT.Player(playerDiv, {
+            videoId: id,
+            width: 560,
+            height: 315,
+            events:{
+                onReady: ()=>startSync()
+            }
+        });
+    }
 
-        if(id){
-
-            log("creating player...");
-
-            state.player = new YT.Player(playerDiv, {
-                videoId: id,
-                width: 560,
-                height: 315,
-                events:{
-                    onReady: ()=>{
-                        log("PLAYER READY");
-                        startSync();
-                    }
-                }
-            });
-
-        }else{
-            log("no video id");
-        }
-
-        render();
-        bindKeys();
-    });
+    render();
+    bindKeys();
+    log();
 }
 
 /* =========================
@@ -307,17 +261,16 @@ function startSync(){
     if(state.syncStarted) return;
     state.syncStarted = true;
 
-    log("sync started");
-
     setInterval(()=>{
 
         if(!state.player) return;
 
         const t = state.player.getCurrentTime() + state.offset;
+        const adjusted = t * state.speed;
 
         for(let i=0;i<state.lines.length;i++){
 
-            if(state.lines[i].time > t){
+            if(state.lines[i].time > adjusted){
 
                 state.index = Math.max(0,i-1);
                 render();
@@ -329,7 +282,7 @@ function startSync(){
 }
 
 /* =========================
-   RENDER
+   RENDER（UI改善版）
 ========================= */
 function render(){
 
@@ -337,10 +290,32 @@ function render(){
     const l = state.lines;
 
     state.lyricsDiv.innerHTML = `
-        <div style="font-size:40px;opacity:.4">${l[i+1]?.text||""}</div>
-        <div style="font-size:80px;margin:20px 0;font-weight:bold">${l[i]?.text||""}</div>
-        <div style="font-size:40px;opacity:.2">${l[i+2]?.text||""}</div>
+        <div style="
+            font-size:40px;
+            opacity:0.55;
+        ">
+            ${l[i-1]?.text || ""}
+        </div>
+
+        <div style="
+            font-size:82px;
+            margin:25px 0;
+            font-weight:bold;
+            opacity:1;
+            text-shadow:0 0 10px rgba(255,255,255,0.25);
+        ">
+            ${l[i]?.text || ""}
+        </div>
+
+        <div style="
+            font-size:40px;
+            opacity:0.8;
+        ">
+            ${l[i+1]?.text || ""}
+        </div>
     `;
+
+    log();
 }
 
 /* =========================
@@ -362,12 +337,22 @@ function bindKeys(){
 
         if(e.key==="+"){
             state.offset += 0.1;
-            log("offset "+state.offset);
+            log();
         }
 
         if(e.key==="-"){
             state.offset -= 0.1;
-            log("offset "+state.offset);
+            log();
+        }
+
+        if(e.key==="]"){
+            state.speed = Math.min(3, state.speed + 0.1);
+            log();
+        }
+
+        if(e.key==="["){
+            state.speed = Math.max(0.3, state.speed - 0.1);
+            log();
         }
 
         if(e.key==="f"){
