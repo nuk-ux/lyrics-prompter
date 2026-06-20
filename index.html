@@ -4,7 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<title>Lyrics Prompter FULL</title>
+<title>Lyrics Prompter PRO</title>
+
+<script src="https://www.youtube.com/iframe_api"></script>
 
 <style>
 body{
@@ -39,20 +41,17 @@ body{
     background:#111;
 }
 
-.artist{
-    opacity:.7;
-}
+.artist{ opacity:.7; }
 
 iframe{
-    width:100%;
-    max-width:560px;
+    width:560px;
     height:315px;
     border:0;
 }
 
 #lyrics{
     text-align:center;
-    margin-top:30px;
+    margin-top:40px;
 }
 </style>
 </head>
@@ -60,7 +59,7 @@ iframe{
 <body>
 
 <div id="app">
-    <h1>Lyrics Prompter FULL</h1>
+    <h1>Lyrics Prompter PRO</h1>
     <input id="search" placeholder="曲名 or アーティスト">
     <div id="results"></div>
 </div>
@@ -71,13 +70,19 @@ const searchBox = document.getElementById("search");
 const results = document.getElementById("results");
 
 let timer;
-let mode = "auto"; // auto / manual
-let offset = 0;
 let player = null;
+let mode = "auto";
 
-// ======================
+// =======================
+// YouTube API READY
+// =======================
+function onYouTubeIframeAPIReady(){
+    console.log("YT READY");
+}
+
+// =======================
 // 検索
-// ======================
+// =======================
 searchBox.addEventListener("input",()=>{
 
     clearTimeout(timer);
@@ -98,7 +103,7 @@ async function searchSongs(q){
     const url =
     "https://itunes.apple.com/search?term="
     + encodeURIComponent(q)
-    + "&entity=song&limit=20&cache=" + Date.now();
+    + "&entity=song&limit=20";
 
     const res = await fetch(url);
     const data = await res.json();
@@ -121,9 +126,9 @@ async function searchSongs(q){
     });
 }
 
-// ======================
+// =======================
 // 歌詞取得
-// ======================
+// =======================
 async function selectTrack(track){
 
     results.innerHTML = "歌詞検索中...";
@@ -148,34 +153,15 @@ async function selectTrack(track){
             <div class="artist">${item.artistName}</div>
         `;
 
-        div.onclick = ()=>startPlayer(item);
+        div.onclick = ()=>start(item);
 
         results.appendChild(div);
     });
 }
 
-// ======================
-// 歌詞開始
-// ======================
-function startPlayer(item){
-
-    let lines;
-
-    if(item.syncedLyrics){
-        lines = parseLRC(item.syncedLyrics);
-    }else{
-        lines = item.plainLyrics
-            .split("\n")
-            .filter(v=>v.trim())
-            .map(t=>({time:0,text:t}));
-    }
-
-    showUI(lines);
-}
-
-// ======================
+// =======================
 // LRC
-// ======================
+// =======================
 function parseLRC(lrc){
 
     const out = [];
@@ -183,7 +169,6 @@ function parseLRC(lrc){
     lrc.split("\n").forEach(l=>{
 
         const m = l.match(/\[(\d+):(\d+\.\d+)\](.*)/);
-
         if(!m) return;
 
         out.push({
@@ -195,10 +180,29 @@ function parseLRC(lrc){
     return out;
 }
 
-// ======================
-// メインUI
-// ======================
-function showUI(lines){
+// =======================
+// 開始
+// =======================
+function start(item){
+
+    let lines;
+
+    if(item.syncedLyrics){
+        lines = parseLRC(item.syncedLyrics);
+    }else{
+        lines = item.plainLyrics
+        .split("\n")
+        .filter(v=>v.trim())
+        .map(t=>({time:0,text:t}));
+    }
+
+    show(lines);
+}
+
+// =======================
+// メイン
+// =======================
+function show(lines){
 
     document.body.innerHTML = "";
     document.body.style.background = "#000";
@@ -215,23 +219,24 @@ function showUI(lines){
     container.appendChild(videoArea);
     container.appendChild(lyricsArea);
 
-    // ======================
+    // =======================
     // YouTube
-    // ======================
-    const url = prompt("YouTube URL（空でもOK）");
+    // =======================
+    const url = prompt("YouTube URL");
+    const videoId = getYoutubeId(url);
 
-    const id = getYoutubeId(url);
+    if(videoId){
 
-    if(id){
-        videoArea.innerHTML =
-        `<iframe src="https://www.youtube.com/embed/${id}"
-        allow="autoplay; encrypted-media"
-        allowfullscreen></iframe>`;
+        player = new YT.Player(videoArea, {
+            videoId: videoId,
+            width: 560,
+            height: 315
+        });
     }
 
-    // ======================
-    // 描画
-    // ======================
+    // =======================
+    // render
+    // =======================
     function render(){
 
         lyricsArea.innerHTML = `
@@ -243,14 +248,14 @@ function showUI(lines){
 
     render();
 
-    // ======================
-    // 自動同期
-    // ======================
-    setInterval(()=>{
+    // =======================
+    // 同期（本体）
+    // =======================
+    const sync = setInterval(()=>{
 
-        if(mode !== "auto") return;
+        if(!player || !player.getCurrentTime) return;
 
-        const t = (player?.getCurrentTime?.() || 0) + offset;
+        const t = player.getCurrentTime();
 
         for(let i=0;i<lines.length;i++){
 
@@ -262,11 +267,11 @@ function showUI(lines){
             }
         }
 
-    },150);
+    },100);
 
-    // ======================
+    // =======================
     // 操作
-    // ======================
+    // =======================
     document.onkeydown = (e)=>{
 
         if(e.key==="ArrowRight"){
@@ -279,21 +284,6 @@ function showUI(lines){
             render();
         }
 
-        // モード切替
-        if(e.key==="m"){
-            mode = mode==="auto"?"manual":"auto";
-        }
-
-        // ズレ補正
-        if(e.key==="+"){
-            offset += 0.1;
-        }
-
-        if(e.key==="-"){
-            offset -= 0.1;
-        }
-
-        // フルスクリーン
         if(e.key==="f"){
             if(!document.fullscreenElement){
                 document.documentElement.requestFullscreen();
@@ -302,16 +292,16 @@ function showUI(lines){
             }
         }
 
-        // リロード
-        if(e.key==="r"){
-            location.reload();
+        if(e.key==="m"){
+            mode = mode==="auto"?"manual":"auto";
         }
+
     };
 }
 
-// ======================
+// =======================
 // YouTube ID
-// ======================
+// =======================
 function getYoutubeId(url){
 
     if(!url) return "";
