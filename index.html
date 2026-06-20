@@ -44,6 +44,7 @@ body{
 }
 
 </style>
+    <script src="https://www.youtube.com/iframe_api"></script>
 </head>
 <body>
 
@@ -302,6 +303,7 @@ function showLyrics(lines){
     document.body.style.color = "#fff";
 
     let index = 0;
+    let player; //Player変数
 
     const container = document.createElement("div");
     container.style.padding = "40px";
@@ -332,7 +334,12 @@ function showLyrics(lines){
 
         iframe.allowFullscreen = true;
 
-        videoArea.appendChild(iframe);
+        //videoArea.appendChild(iframe); //下記に置き換えた
+        player = new YT.Player(videoArea, {
+        videoId: videoId,
+        width: 560,
+        height: 315
+        });
     }
 
     function render(){
@@ -397,6 +404,25 @@ function showLyrics(lines){
 
     }
 
+    setInterval(() => {
+
+    if(!player || !player.getCurrentTime) return;
+
+    const t = player.getCurrentTime();
+
+    for(let i = 0; i < lines.length; i++){
+
+        if(lines[i].time > t){
+
+            index = Math.max(0, i - 1);
+
+            render();
+
+            break;
+        }
+    }
+
+    }, 200);
 };
 
     
