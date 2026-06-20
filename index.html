@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lyrics Prompter PRO</title>
+<title>Lyrics Prompter PRO DEBUG</title>
 
 <script src="https://www.youtube.com/iframe_api"></script>
 
@@ -39,10 +39,6 @@ body{
 
 .artist{ opacity:.7; }
 
-#player{
-    margin-top:20px;
-}
-
 #lyrics{
     text-align:center;
     margin-top:40px;
@@ -61,7 +57,29 @@ body{
 <script>
 
 /* =========================
-   STATE（商用設計の核）
+   DEBUG HUD（重要）
+========================= */
+const debug = document.createElement("div");
+debug.style = `
+position:fixed;
+bottom:10px;
+right:10px;
+background:rgba(0,0,0,0.7);
+color:#0f0;
+font-size:12px;
+padding:8px;
+max-width:300px;
+z-index:9999;
+white-space:pre;
+`;
+document.body.appendChild(debug);
+
+function log(msg){
+    debug.innerText = msg;
+}
+
+/* =========================
+   STATE
 ========================= */
 const state = {
     player: null,
@@ -69,7 +87,16 @@ const state = {
     index: 0,
     mode: "auto",
     offset: 0,
-    ready: false
+    ytReady: false,
+    syncStarted: false
+};
+
+/* =========================
+   YT READY
+========================= */
+window.onYouTubeIframeAPIReady = () => {
+    state.ytReady = true;
+    log("YT READY");
 };
 
 /* =========================
@@ -81,14 +108,7 @@ const results = document.getElementById("results");
 let timer;
 
 /* =========================
-   YouTube READY
-========================= */
-function onYouTubeIframeAPIReady(){
-    state.ready = true;
-}
-
-/* =========================
-   SEARCH iTunes
+   SEARCH
 ========================= */
 searchBox.addEventListener("input",()=>{
 
@@ -104,6 +124,8 @@ searchBox.addEventListener("input",()=>{
 });
 
 async function search(q){
+
+    log("searching...");
 
     results.innerHTML = "検索中...";
 
@@ -129,12 +151,16 @@ async function search(q){
 
         results.appendChild(div);
     });
+
+    log("search done");
 }
 
 /* =========================
-   LYRICS API
+   LYRICS
 ========================= */
 async function fetchLyrics(track){
+
+    log("fetch lyrics...");
 
     results.innerHTML = "歌詞取得中...";
 
@@ -160,6 +186,8 @@ async function fetchLyrics(track){
 
         results.appendChild(div);
     });
+
+    log("lyrics loaded");
 }
 
 /* =========================
@@ -181,26 +209,30 @@ function parseLRC(lrc){
 }
 
 /* =========================
-   SESSION START
+   SESSION
 ========================= */
 function startSession(item){
+
+    log("session start");
 
     if(item.syncedLyrics){
         state.lines = parseLRC(item.syncedLyrics);
     }else{
         state.lines = item.plainLyrics
-        .split("\n")
-        .filter(v=>v.trim())
-        .map(t=>({time:0,text:t}));
+            .split("\n")
+            .filter(v=>v.trim())
+            .map(t=>({time:0,text:t}));
     }
 
     renderShell();
 }
 
 /* =========================
-   UI BUILD
+   SHELL
 ========================= */
 function renderShell(){
+
+    log("render shell");
 
     document.body.innerHTML = "";
 
@@ -212,36 +244,50 @@ function renderShell(){
 
     wrap.appendChild(playerDiv);
     wrap.appendChild(lyricsDiv);
-
     document.body.appendChild(wrap);
 
-    const url = prompt("YouTube URL（必須ではない）");
+    state.lyricsDiv = lyricsDiv;
+
+    const url = prompt("YouTube URL（空でもOK）");
 
     const id = getYoutubeId(url);
 
-    if(id && state.ready){
+    if(id){
+
+        if(!state.ytReady){
+            log("YT not ready → waiting");
+        }
 
         state.player = new YT.Player(playerDiv, {
             videoId: id,
             width: 560,
             height: 315,
             events:{
-                onReady: startSync
+                onReady: () => {
+                    log("PLAYER READY");
+                    startSync();
+                }
             }
         });
+
+    }else{
+        log("no video");
     }
 
-    state.lyricsDiv = lyricsDiv;
-
     render();
-
     bindKeys();
 }
 
 /* =========================
-   SYNC ENGINE（ここが本体）
+   SYNC ENGINE（修正ポイント）
 ========================= */
 function startSync(){
+
+    if(state.syncStarted) return;
+
+    state.syncStarted = true;
+
+    log("sync started");
 
     setInterval(()=>{
 
@@ -260,7 +306,7 @@ function startSync(){
             }
         }
 
-    },80);
+    },100);
 }
 
 /* =========================
@@ -276,6 +322,8 @@ function render(){
         <div style="font-size:80px;margin:20px 0;font-weight:bold">${l[i]?.text||""}</div>
         <div style="font-size:40px;opacity:.2">${l[i+2]?.text||""}</div>
     `;
+
+    log(`render index=${i}`);
 }
 
 /* =========================
@@ -297,14 +345,17 @@ function bindKeys(){
 
         if(e.key==="m"){
             state.mode = state.mode==="auto"?"manual":"auto";
+            log("mode="+state.mode);
         }
 
         if(e.key==="+"){
             state.offset += 0.1;
+            log("offset="+state.offset);
         }
 
         if(e.key==="-"){
             state.offset -= 0.1;
+            log("offset="+state.offset);
         }
 
         if(e.key==="f"){
@@ -318,7 +369,7 @@ function bindKeys(){
 }
 
 /* =========================
-   YOUTUBE ID
+   UTIL
 ========================= */
 function getYoutubeId(url){
 
