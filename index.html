@@ -163,15 +163,73 @@ async function searchSongs(q){
 
 }
 
-function selectTrack(track){
+async function selectTrack(track){
 
-    console.log(track);
+    results.innerHTML = "歌詞検索中...";
 
-    alert(
-        track.artistName
-        + "\n"
-        + track.trackName
-    );
+    try{
+
+        const url =
+        "https://lrclib.net/api/search?"
+        + "track_name="
+        + encodeURIComponent(track.trackName)
+        + "&artist_name="
+        + encodeURIComponent(track.artistName);
+
+        const res = await fetch(url);
+
+        const lyricsList =
+        await res.json();
+
+        results.innerHTML = "";
+
+        if(!lyricsList.length){
+
+            results.innerHTML =
+            "歌詞が見つかりません";
+
+            return;
+        }
+
+        lyricsList.forEach(item=>{
+
+            const div =
+            document.createElement("div");
+
+            div.className="result";
+
+            div.innerHTML=`
+                <div>${item.trackName}</div>
+                <div class="artist">
+                    ${item.artistName}
+                </div>
+            `;
+
+            div.onclick=()=>{
+
+                console.log(item);
+
+                alert(
+                    item.syncedLyrics
+                    ? "同期歌詞あり"
+                    : "歌詞のみ"
+                );
+
+            };
+
+            results.appendChild(div);
+
+        });
+
+    }
+    catch(err){
+
+        console.error(err);
+
+        results.innerHTML =
+        "歌詞取得失敗";
+
+    }
 
 }
 
