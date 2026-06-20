@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lyrics Prompter PROMISE</title>
+<title>Lyrics Prompter STABLE</title>
 
 <script src="https://www.youtube.com/iframe_api"></script>
 
@@ -34,16 +34,23 @@ body{
     cursor:pointer;
 }
 
-.result:hover{ background:#111; }
+.result:hover{
+    background:#111;
+}
 
 .artist{ opacity:.7; }
+
+#lyrics{
+    text-align:center;
+    margin-top:40px;
+}
 </style>
 </head>
 
 <body>
 
 <div id="app">
-    <h1>Lyrics Prompter PROMISE</h1>
+    <h1>Lyrics Prompter STABLE</h1>
     <input id="search" placeholder="曲名 / アーティスト">
     <div id="results"></div>
 </div>
@@ -51,16 +58,26 @@ body{
 <script>
 
 /* =========================
-   PROMISE: YouTube API READY
+   DEBUG HUD
 ========================= */
-let resolveYT;
-const ytReady = new Promise(resolve => {
-    resolveYT = resolve;
-});
+const debug = document.createElement("div");
+debug.style = `
+position:fixed;
+bottom:10px;
+right:10px;
+background:#000;
+color:#0f0;
+font-size:12px;
+padding:8px;
+z-index:99999;
+white-space:pre;
+max-width:300px;
+`;
+document.body.appendChild(debug);
 
-window.onYouTubeIframeAPIReady = () => {
-    resolveYT();
-};
+function log(msg){
+    debug.innerText = msg;
+}
 
 /* =========================
    STATE
@@ -70,17 +87,27 @@ const state = {
     lines: [],
     index: 0,
     mode: "auto",
-    offset: 0
+    offset: 0,
+    ytReady: false,
+    syncStarted: false
 };
 
+/* =========================
+   YOUTUBE API READY
+========================= */
+window.onYouTubeIframeAPIReady = () => {
+    state.ytReady = true;
+    log("YT API READY");
+};
+
+/* =========================
+   SEARCH
+========================= */
 const searchBox = document.getElementById("search");
 const results = document.getElementById("results");
 
 let timer;
 
-/* =========================
-   SEARCH
-========================= */
 searchBox.addEventListener("input",()=>{
 
     clearTimeout(timer);
@@ -95,6 +122,8 @@ searchBox.addEventListener("input",()=>{
 });
 
 async function search(q){
+
+    log("searching...");
 
     results.innerHTML = "検索中...";
 
@@ -120,12 +149,16 @@ async function search(q){
 
         results.appendChild(div);
     });
+
+    log("search done");
 }
 
 /* =========================
    LYRICS
 ========================= */
 async function fetchLyrics(track){
+
+    log("fetch lyrics...");
 
     results.innerHTML = "歌詞取得中...";
 
@@ -151,6 +184,8 @@ async function fetchLyrics(track){
 
         results.appendChild(div);
     });
+
+    log("lyrics loaded");
 }
 
 /* =========================
@@ -176,6 +211,8 @@ function parseLRC(lrc){
 ========================= */
 function start(item){
 
+    log("session start");
+
     if(item.syncedLyrics){
         state.lines = parseLRC(item.syncedLyrics);
     }else{
@@ -189,9 +226,32 @@ function start(item){
 }
 
 /* =========================
-   UI + YOUTUBE (PROMISE SAFE)
+   WAIT YT SAFE
 ========================= */
-async function showPlayer(){
+function waitYT(callback){
+
+    log("waiting YT...");
+
+    const timer = setInterval(()=>{
+
+        if(state.ytReady && window.YT && YT.Player){
+
+            clearInterval(timer);
+            log("YT CONFIRMED");
+
+            callback();
+
+        }else{
+            log("loading YT...");
+        }
+
+    },200);
+}
+
+/* =========================
+   UI + PLAYER
+========================= */
+function showPlayer(){
 
     document.body.innerHTML = "";
 
@@ -207,32 +267,47 @@ async function showPlayer(){
 
     state.lyricsDiv = lyricsDiv;
 
-    const url = prompt("YouTube URL（空OK）");
+    const url = prompt("YouTube URL（空でもOK）");
     const id = getYoutubeId(url);
 
-    // ★ここがPromiseの核
-    await ytReady;
+    log("init...");
 
-    if(id){
+    waitYT(()=>{
 
-        state.player = new YT.Player(playerDiv, {
-            videoId: id,
-            width: 560,
-            height: 315,
-            events:{
-                onReady: startSync
-            }
-        });
-    }
+        if(id){
 
-    render();
-    bindKeys();
+            log("creating player...");
+
+            state.player = new YT.Player(playerDiv, {
+                videoId: id,
+                width: 560,
+                height: 315,
+                events:{
+                    onReady: ()=>{
+                        log("PLAYER READY");
+                        startSync();
+                    }
+                }
+            });
+
+        }else{
+            log("no video id");
+        }
+
+        render();
+        bindKeys();
+    });
 }
 
 /* =========================
-   SYNC ENGINE
+   SYNC
 ========================= */
 function startSync(){
+
+    if(state.syncStarted) return;
+    state.syncStarted = true;
+
+    log("sync started");
 
     setInterval(()=>{
 
@@ -287,10 +362,12 @@ function bindKeys(){
 
         if(e.key==="+"){
             state.offset += 0.1;
+            log("offset "+state.offset);
         }
 
         if(e.key==="-"){
             state.offset -= 0.1;
+            log("offset "+state.offset);
         }
 
         if(e.key==="f"){
