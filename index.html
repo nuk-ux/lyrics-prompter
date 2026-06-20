@@ -33,6 +33,7 @@ body{
 }
 
 .result:hover{ background:#111; }
+
 .artist{ opacity:.7; }
 
 .player{
@@ -107,8 +108,7 @@ const state = {
     index: 0,
     speed: 1,
     offset: 0,
-    syncStarted: false,
-    ytReady: false
+    syncStarted: false
 };
 
 const topScreen = document.getElementById("topScreen");
@@ -130,14 +130,7 @@ function showScreen(name){
 }
 
 /* =========================
-   YT READY
-========================= */
-window.onYouTubeIframeAPIReady = () => {
-    state.ytReady = true;
-};
-
-/* =========================
-   SEARCH (iTunes)
+   SEARCH (iTunes + JPスコア)
 ========================= */
 searchBox.addEventListener("input",()=>{
 
@@ -159,7 +152,7 @@ function score(track){
     if(/[ぁ-んァ-ン一-龥]/.test(track.trackName)) s += 2;
     if(/[ぁ-んァ-ン一-龥]/.test(track.artistName)) s += 2;
 
-    if(/jpop|j-pop|anime|歌|cover/i.test(track.trackName)) s += 1;
+    if(/jpop|j-pop|anime|cover/i.test(track.trackName)) s += 1;
 
     return s;
 }
@@ -264,7 +257,7 @@ function start(item){
 }
 
 /* =========================
-   PLAYER
+   PLAYER（修正済み）
 ========================= */
 function buildPlayer(){
 
@@ -284,17 +277,24 @@ function buildPlayer(){
         state.player = null;
     }
 
-    if(id && state.ytReady){
-
-        state.player = new YT.Player(div, {
-            videoId: id,
-            width: 480,
-            height: 270,
-            events:{
-                onReady: ()=>startSync()
-            }
-        });
+    if(!id){
+        alert("YouTube ID取得失敗");
+        return;
     }
+
+    // ★ ytReady依存削除（ここ重要）
+    state.player = new YT.Player(div, {
+        videoId: id,
+        width: 480,
+        height: 270,
+        events:{
+            onReady: ()=>{
+                console.log("READY");
+                state.player.playVideo(); // ★必須
+                startSync();
+            }
+        }
+    });
 
     state.index = 0;
     render();
@@ -345,7 +345,7 @@ function buildControls(){
 }
 
 /* =========================
-   SYNC LOOP
+   SYNC LOOP（安定版）
 ========================= */
 function startSync(){
 
@@ -359,16 +359,19 @@ function startSync(){
         const t = state.player.getCurrentTime() + state.offset;
         const a = t * state.speed;
 
-        for(let i=0;i<state.lines.length;i++){
+        const lines = state.lines;
+        if(!lines || lines.length === 0) return;
 
-            if(state.lines[i].time > a){
+        for(let i=0;i<lines.length;i++){
+
+            if(lines[i].time > a){
                 state.index = Math.max(0,i-1);
                 render();
                 break;
             }
         }
 
-    },100);
+    },120);
 }
 
 /* =========================
