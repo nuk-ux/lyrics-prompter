@@ -15,11 +15,8 @@ body{
     font-family:sans-serif;
 }
 
-#app{
-    max-width:900px;
-    margin:auto;
-    padding:20px;
-}
+.screen{ display:none; padding:20px; }
+.screen.active{ display:block; }
 
 #search{
     width:100%;
@@ -36,37 +33,29 @@ body{
 }
 
 .result:hover{ background:#111; }
-
 .artist{ opacity:.7; }
 
-/* 🎥 小さめ動画 */
+/* player */
 .player{
     width:100%;
-    max-width:480px;   /* ←ここ重要 */
+    max-width:480px;
     aspect-ratio:16/9;
     margin:20px auto;
 }
 
-.player iframe{
-    width:100%;
-    height:100%;
-    border:0;
-}
-
-/* 🎤 lyrics */
 #lyrics{
     text-align:center;
     margin-top:30px;
 }
 
-/* 🎛 controls */
-.controls{
+/* controls（常駐） */
+#controls{
     position:fixed;
     bottom:10px;
     left:10px;
     display:flex;
-    gap:8px;
     flex-wrap:wrap;
+    gap:6px;
     z-index:9999;
 }
 
@@ -78,48 +67,72 @@ button{
     cursor:pointer;
 }
 
-button:hover{
-    background:#222;
-}
+button:hover{ background:#222; }
 
-/* 🏠 top button */
 .topbar{
     position:fixed;
     top:10px;
     left:10px;
     z-index:9999;
 }
-
-.topbar button{
-    background:#222;
-}
 </style>
 </head>
 
 <body>
 
-<div id="app">
+<!-- TOP -->
+<div id="topScreen" class="screen active">
     <h1>Lyrics Prompter Laule'a</h1>
     <input id="search" placeholder="曲名 / アーティスト">
     <div id="results"></div>
 </div>
 
+<!-- PLAYER -->
+<div id="playerScreen" class="screen">
+
+    <div class="topbar">
+        <button id="backBtn">← TOP</button>
+    </div>
+
+    <div id="playerWrap"></div>
+    <div id="lyrics"></div>
+</div>
+
+<!-- controls（常駐） -->
+<div id="controls"></div>
+
 <script>
 
+/* =========================
+   STATE
+========================= */
 const state = {
     player: null,
     lines: [],
     index: 0,
+    speed: 1,
     offset: 0,
-    speed: 1.0,
-    ytReady: false,
-    syncStarted: false
+    syncStarted: false,
+    ytReady: false
 };
 
-const searchBox = document.getElementById("search");
+const topScreen = document.getElementById("topScreen");
+const playerScreen = document.getElementById("playerScreen");
 const results = document.getElementById("results");
+const searchBox = document.getElementById("search");
 
 let timer;
+
+/* =========================
+   SCREEN
+========================= */
+function showScreen(name){
+    topScreen.classList.remove("active");
+    playerScreen.classList.remove("active");
+
+    if(name==="top") topScreen.classList.add("active");
+    if(name==="player") playerScreen.classList.add("active");
+}
 
 /* =========================
    YT READY
@@ -204,7 +217,7 @@ async function fetchLyrics(track){
 }
 
 /* =========================
-   LRC
+   PARSE LRC
 ========================= */
 function parseLRC(lrc){
 
@@ -226,57 +239,40 @@ function parseLRC(lrc){
 ========================= */
 function start(item){
 
-    if(item.syncedLyrics){
-        state.lines = parseLRC(item.syncedLyrics);
-    }else{
-        state.lines = item.plainLyrics
-            .split("\n")
+    state.lines = item.syncedLyrics
+        ? parseLRC(item.syncedLyrics)
+        : item.plainLyrics.split("\n")
             .filter(v=>v.trim())
             .map(t=>({time:0,text:t}));
-    }
 
-    showPlayer();
+    buildPlayer();
+    showScreen("player");
+    buildControls();
 }
 
 /* =========================
-   UI SCREEN
+   PLAYER
 ========================= */
-function showPlayer(){
+function buildPlayer(){
 
-    document.body.innerHTML = "";
+    const wrap = document.getElementById("playerWrap");
+    wrap.innerHTML = "";
 
-    /* 🏠 top戻るボタン */
-    const topbar = document.createElement("div");
-    topbar.className = "topbar";
+    const div = document.createElement("div");
+    div.className = "player";
 
-    const backBtn = document.createElement("button");
-    backBtn.innerText = "← TOP";
-    backBtn.onclick = ()=>location.reload();
+    wrap.appendChild(div);
 
-    topbar.appendChild(backBtn);
-    document.body.appendChild(topbar);
+    const id = getYoutubeId(prompt("YouTube URL"));
 
-    const wrap = document.createElement("div");
-    wrap.style.padding = "20px";
-
-    const playerDiv = document.createElement("div");
-    playerDiv.className = "player";
-
-    const lyricsDiv = document.createElement("div");
-    lyricsDiv.id = "lyrics";
-
-    wrap.appendChild(playerDiv);
-    wrap.appendChild(lyricsDiv);
-    document.body.appendChild(wrap);
-
-    state.lyricsDiv = lyricsDiv;
-
-    const url = prompt("YouTube URL（空OK）");
-    const id = getYoutubeId(url);
+    if(state.player){
+        state.player.destroy();
+        state.player = null;
+    }
 
     if(id && state.ytReady){
 
-        state.player = new YT.Player(playerDiv, {
+        state.player = new YT.Player(div, {
             videoId: id,
             width: 480,
             height: 270,
@@ -286,8 +282,45 @@ function showPlayer(){
         });
     }
 
+    state.index = 0;
     render();
-    bindKeys();
+}
+
+/* =========================
+   CONTROLS（常駐）
+========================= */
+function buildControls(){
+
+    const c = document.getElementById("controls");
+
+    c.innerHTML = `
+        <button id="speedDown">-speed</button>
+        <button id="speedUp">+speed</button>
+        <button id="offsetDown">-offset</button>
+        <button id="offsetUp">+offset</button>
+        <button id="reset">reset</button>
+        <button id="fs">fullscreen</button>
+    `;
+
+    document.getElementById("speedUp").onclick = ()=> state.speed = Math.min(3,state.speed+0.1);
+    document.getElementById("speedDown").onclick = ()=> state.speed = Math.max(0.3,state.speed-0.1);
+
+    document.getElementById("offsetUp").onclick = ()=> state.offset += 0.1;
+    document.getElementById("offsetDown").onclick = ()=> state.offset -= 0.1;
+
+    document.getElementById("reset").onclick = ()=>{
+        state.index = 0;
+        if(state.player) state.player.seekTo(0);
+        render();
+    };
+
+    document.getElementById("fs").onclick = ()=>{
+        if(!document.fullscreenElement){
+            document.documentElement.requestFullscreen();
+        }else{
+            document.exitFullscreen();
+        }
+    };
 }
 
 /* =========================
@@ -303,12 +336,11 @@ function startSync(){
         if(!state.player) return;
 
         const t = state.player.getCurrentTime() + state.offset;
-        const adjusted = t * state.speed;
+        const a = t * state.speed;
 
         for(let i=0;i<state.lines.length;i++){
 
-            if(state.lines[i].time > adjusted){
-
+            if(state.lines[i].time > a){
                 state.index = Math.max(0,i-1);
                 render();
                 break;
@@ -326,20 +358,34 @@ function render(){
     const i = state.index;
     const l = state.lines;
 
-    state.lyricsDiv.innerHTML = `
-        <div style="font-size:36px;opacity:0.5">${l[i-1]?.text||""}</div>
+    document.getElementById("lyrics").innerHTML = `
+        <div style="font-size:36px;opacity:.5">${l[i-1]?.text||""}</div>
         <div style="font-size:70px;margin:20px 0;font-weight:bold">${l[i]?.text||""}</div>
-        <div style="font-size:36px;opacity:0.75">${l[i+1]?.text||""}</div>
+        <div style="font-size:36px;opacity:.75">${l[i+1]?.text||""}</div>
     `;
 }
+
+/* =========================
+   BACK
+========================= */
+document.getElementById("backBtn").onclick = ()=>{
+
+    if(state.player){
+        state.player.destroy();
+        state.player = null;
+    }
+
+    state.syncStarted = false;
+    state.index = 0;
+
+    showScreen("top");
+};
 
 /* =========================
    UTIL
 ========================= */
 function getYoutubeId(url){
-
     if(!url) return "";
-
     const m = url.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([a-zA-Z0-9_-]{11})/);
     return m ? m[1] : "";
 }
