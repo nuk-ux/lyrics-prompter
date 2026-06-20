@@ -360,6 +360,26 @@ function showLyrics(lines){
     }
 
     render();
+    
+    setInterval(() => {
+
+    if(!player || !player.getCurrentTime) return;
+
+    const t = player.getCurrentTime();
+
+    for(let i = 0; i < lines.length; i++){
+
+        if(lines[i].time > t){
+
+            index = Math.max(0, i - 1);
+
+            render();
+
+            break;
+        }
+    }
+
+    }, 200);
 
     document.onkeydown=(e)=>{
 
@@ -404,25 +424,7 @@ function showLyrics(lines){
 
     }
 
-    setInterval(() => {
-
-    if(!player || !player.getCurrentTime) return;
-
-    const t = player.getCurrentTime();
-
-    for(let i = 0; i < lines.length; i++){
-
-        if(lines[i].time > t){
-
-            index = Math.max(0, i - 1);
-
-            render();
-
-            break;
-        }
-    }
-
-    }, 200);
+    
 };
 
     
