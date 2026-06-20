@@ -296,6 +296,8 @@ function loadLyrics(item){
 }
 
 function showLyrics(lines){
+    
+    const originalHtml = document.body.innerHTML;
 
     document.body.innerHTML = "";
 
@@ -349,31 +351,48 @@ function showLyrics(lines){
 
     document.onkeydown=(e)=>{
 
-        if(e.key==="ArrowRight"){
+    if(e.key==="ArrowRight"){
 
-            index=
-            Math.min(
-                lines.length-1,
-                index+1
-            );
+        index=
+        Math.min(
+            lines.length-1,
+            index+1
+        );
 
-            render();
+        render();
+    }
+
+    if(e.key==="ArrowLeft"){
+
+        index=
+        Math.max(
+            0,
+            index-1
+        );
+
+        render();
+    }
+
+    if(e.key==="f" || e.key==="F"){
+
+        if(!document.fullscreenElement){
+
+            document.documentElement.requestFullscreen();
+
+        }else{
+
+            document.exitFullscreen();
 
         }
+    }
 
-        if(e.key==="ArrowLeft"){
+    if(e.key==="s" || e.key==="S"){
 
-            index=
-            Math.max(
-                0,
-                index-1
-            );
+        location.reload();
 
-            render();
+    }
 
-        }
-
-    };
+};
 
 }
 </script>
