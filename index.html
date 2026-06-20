@@ -308,7 +308,12 @@ function showLyrics(lines){
 
     document.body.appendChild(container);
 
-    // ←ここに入れる
+    const videoArea = document.createElement("div");
+    const lyricsArea = document.createElement("div");
+
+    container.appendChild(videoArea);
+    container.appendChild(lyricsArea);
+
     const youtubeUrl = prompt("YouTube URLを入力");
     const videoId = getYoutubeId(youtubeUrl);
 
@@ -327,12 +332,12 @@ function showLyrics(lines){
 
         iframe.allowFullscreen = true;
 
-        container.appendChild(iframe);
+        videoArea.appendChild(iframe);
     }
 
     function render(){
 
-        container.innerHTML = `
+        lyricsArea.innerHTML = `
             <div style="font-size:40px;opacity:.5">
                 ${lines[index+1]?.text || ""}
             </div>
