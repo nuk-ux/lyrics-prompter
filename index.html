@@ -35,17 +35,16 @@ body{
     cursor:pointer;
 }
 
-.result:hover{
-    background:#111;
-}
+.result:hover{ background:#111; }
 
 .artist{ opacity:.7; }
 
-/* 🎥 player responsive */
+/* 🎥 小さめ動画 */
 .player{
     width:100%;
+    max-width:480px;   /* ←ここ重要 */
     aspect-ratio:16/9;
-    margin-top:20px;
+    margin:20px auto;
 }
 
 .player iframe{
@@ -57,8 +56,7 @@ body{
 /* 🎤 lyrics */
 #lyrics{
     text-align:center;
-    margin-top:40px;
-    padding:0 10px;
+    margin-top:30px;
 }
 
 /* 🎛 controls */
@@ -76,11 +74,23 @@ button{
     background:#111;
     color:#fff;
     border:1px solid #333;
-    padding:8px 10px;
+    padding:6px 10px;
     cursor:pointer;
 }
 
 button:hover{
+    background:#222;
+}
+
+/* 🏠 top button */
+.topbar{
+    position:fixed;
+    top:10px;
+    left:10px;
+    z-index:9999;
+}
+
+.topbar button{
     background:#222;
 }
 </style>
@@ -96,9 +106,6 @@ button:hover{
 
 <script>
 
-/* =========================
-   STATE
-========================= */
 const state = {
     player: null,
     lines: [],
@@ -115,14 +122,14 @@ const results = document.getElementById("results");
 let timer;
 
 /* =========================
-   YOUTUBE READY
+   YT READY
 ========================= */
 window.onYouTubeIframeAPIReady = () => {
     state.ytReady = true;
 };
 
 /* =========================
-   SEARCH (iTunes)
+   SEARCH
 ========================= */
 searchBox.addEventListener("input",()=>{
 
@@ -166,7 +173,7 @@ async function search(q){
 }
 
 /* =========================
-   LYRICS API
+   LYRICS
 ========================= */
 async function fetchLyrics(track){
 
@@ -197,7 +204,7 @@ async function fetchLyrics(track){
 }
 
 /* =========================
-   PARSE LRC
+   LRC
 ========================= */
 function parseLRC(lrc){
 
@@ -232,11 +239,22 @@ function start(item){
 }
 
 /* =========================
-   UI INIT
+   UI SCREEN
 ========================= */
 function showPlayer(){
 
     document.body.innerHTML = "";
+
+    /* 🏠 top戻るボタン */
+    const topbar = document.createElement("div");
+    topbar.className = "topbar";
+
+    const backBtn = document.createElement("button");
+    backBtn.innerText = "← TOP";
+    backBtn.onclick = ()=>location.reload();
+
+    topbar.appendChild(backBtn);
+    document.body.appendChild(topbar);
 
     const wrap = document.createElement("div");
     wrap.style.padding = "20px";
@@ -253,49 +271,6 @@ function showPlayer(){
 
     state.lyricsDiv = lyricsDiv;
 
-    /* controls */
-    const controls = document.createElement("div");
-    controls.className = "controls";
-
-    controls.innerHTML = `
-        <button id="speedDown">-speed</button>
-        <button id="speedUp">+speed</button>
-        <button id="offsetDown">-offset</button>
-        <button id="offsetUp">+offset</button>
-        <button id="fullscreen">fullscreen</button>
-    `;
-
-    document.body.appendChild(controls);
-
-    /* events */
-    document.getElementById("speedUp").onclick = ()=>{
-        state.speed = Math.min(3, state.speed + 0.1);
-        log();
-    };
-
-    document.getElementById("speedDown").onclick = ()=>{
-        state.speed = Math.max(0.3, state.speed - 0.1);
-        log();
-    };
-
-    document.getElementById("offsetUp").onclick = ()=>{
-        state.offset += 0.1;
-        log();
-    };
-
-    document.getElementById("offsetDown").onclick = ()=>{
-        state.offset -= 0.1;
-        log();
-    };
-
-    document.getElementById("fullscreen").onclick = ()=>{
-        if(!document.fullscreenElement){
-            document.documentElement.requestFullscreen();
-        }else{
-            document.exitFullscreen();
-        }
-    };
-
     const url = prompt("YouTube URL（空OK）");
     const id = getYoutubeId(url);
 
@@ -303,8 +278,8 @@ function showPlayer(){
 
         state.player = new YT.Player(playerDiv, {
             videoId: id,
-            width: 560,
-            height: 315,
+            width: 480,
+            height: 270,
             events:{
                 onReady: ()=>startSync()
             }
@@ -312,10 +287,11 @@ function showPlayer(){
     }
 
     render();
+    bindKeys();
 }
 
 /* =========================
-   SYNC ENGINE
+   SYNC
 ========================= */
 function startSync(){
 
@@ -351,30 +327,10 @@ function render(){
     const l = state.lines;
 
     state.lyricsDiv.innerHTML = `
-        <div style="font-size:40px;opacity:0.6">
-            ${l[i-1]?.text || ""}
-        </div>
-
-        <div style="
-            font-size:80px;
-            margin:20px 0;
-            font-weight:bold;
-            opacity:1;
-        ">
-            ${l[i]?.text || ""}
-        </div>
-
-        <div style="font-size:40px;opacity:0.8">
-            ${l[i+1]?.text || ""}
-        </div>
+        <div style="font-size:36px;opacity:0.5">${l[i-1]?.text||""}</div>
+        <div style="font-size:70px;margin:20px 0;font-weight:bold">${l[i]?.text||""}</div>
+        <div style="font-size:36px;opacity:0.75">${l[i+1]?.text||""}</div>
     `;
-}
-
-/* =========================
-   LOG (simple)
-========================= */
-function log(){
-    console.log("speed:", state.speed, "offset:", state.offset);
 }
 
 /* =========================
