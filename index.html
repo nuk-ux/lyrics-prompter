@@ -3,7 +3,6 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
 <title>Lyrics Prompter</title>
 
 <script src="https://www.youtube.com/iframe_api"></script>
@@ -60,7 +59,11 @@ const searchBox = document.getElementById("search");
 const results = document.getElementById("results");
 
 let timer;
+let player = null;
 
+// ======================
+// 検索
+// ======================
 searchBox.addEventListener("input",()=>{
 
     clearTimeout(timer);
@@ -72,10 +75,7 @@ searchBox.addEventListener("input",()=>{
         return;
     }
 
-    timer = setTimeout(()=>{
-        searchSongs(q);
-    },300);
-
+    timer = setTimeout(()=>searchSongs(q),300);
 });
 
 async function searchSongs(q){
@@ -116,6 +116,9 @@ async function searchSongs(q){
 
 }
 
+// ======================
+// 歌詞検索
+// ======================
 async function selectTrack(track){
 
     results.innerHTML = "歌詞検索中...";
@@ -156,25 +159,30 @@ async function selectTrack(track){
     }catch(e){
         results.innerHTML = "歌詞取得失敗";
     }
-
 }
 
+// ======================
+// 歌詞ロード
+// ======================
 function loadLyrics(item){
 
-    if(item.syncedLyrics){
-        const lines = parseLRC(item.syncedLyrics);
-        showLyrics(lines);
-    }else{
-        const lines = item.plainLyrics
-        .split("\n")
-        .filter(v=>v.trim())
-        .map(t=>({ time:0, text:t }));
+    let lines;
 
-        showLyrics(lines);
+    if(item.syncedLyrics){
+        lines = parseLRC(item.syncedLyrics);
+    }else{
+        lines = item.plainLyrics
+            .split("\n")
+            .filter(v=>v.trim())
+            .map(t=>({time:0,text:t}));
     }
 
+    showLyrics(lines);
 }
 
+// ======================
+// LRC解析
+// ======================
 function parseLRC(lrc){
 
     const result = [];
@@ -193,11 +201,18 @@ function parseLRC(lrc){
     });
 
     return result;
-
 }
 
-let player;
+// ======================
+// YouTube準備フック
+// ======================
+function onYouTubeIframeAPIReady(){
+    // 必須（空でOK）
+}
 
+// ======================
+// メイン表示
+// ======================
 function showLyrics(lines){
 
     document.body.innerHTML = "";
@@ -216,19 +231,29 @@ function showLyrics(lines){
     container.appendChild(videoArea);
     container.appendChild(lyricsArea);
 
+    // ======================
+    // YouTube
+    // ======================
     const youtubeUrl = prompt("YouTube URLを入力");
     const videoId = getYoutubeId(youtubeUrl);
 
     if(videoId){
+
+        if(typeof YT === "undefined" || !YT.Player){
+            alert("YouTube API読み込み中");
+            return;
+        }
 
         player = new YT.Player(videoArea, {
             videoId: videoId,
             width: 560,
             height: 315
         });
-
     }
 
+    // ======================
+    // 描画
+    // ======================
     function render(){
 
         lyricsArea.innerHTML = `
@@ -248,8 +273,10 @@ function showLyrics(lines){
 
     render();
 
-    // ★ここが正しい場所（1回だけ）
-    setInterval(()=>{
+    // ======================
+    // 自動同期（ここ重要）
+    // ======================
+    const sync = setInterval(()=>{
 
         if(!player || !player.getCurrentTime) return;
 
@@ -259,7 +286,7 @@ function showLyrics(lines){
 
             if(lines[i].time > t){
 
-                index = Math.max(0, i-1);
+                index = Math.max(0,i-1);
                 render();
                 break;
             }
@@ -267,6 +294,9 @@ function showLyrics(lines){
 
     },200);
 
+    // ======================
+    // 操作
+    // ======================
     document.onkeydown = (e)=>{
 
         if(e.key==="ArrowRight"){
@@ -290,11 +320,12 @@ function showLyrics(lines){
         if(e.key==="s"||e.key==="S"){
             location.reload();
         }
-
     };
-
 }
 
+// ======================
+// YouTube ID
+// ======================
 function getYoutubeId(url){
 
     const m = url.match(/(?:v=|youtu\.be\/)([^&]+)/i);
