@@ -208,12 +208,7 @@ async function selectTrack(track){
             div.onclick=()=>{
 
                 console.log(item);
-
-                alert(
-                    item.syncedLyrics
-                    ? "同期歌詞あり"
-                    : "歌詞のみ"
-                );
+                loadLyrics(item);
 
             };
 
@@ -232,7 +227,155 @@ async function selectTrack(track){
     }
 
 }
+    
+function loadLyrics(item){
 
+    if(item.syncedLyrics){
+
+        const lines =
+        parseLRC(item.syncedLyrics);
+
+        console.log(lines);
+
+        showLyrics(lines);
+
+    }
+    else{
+
+        const lines =
+        item.plainLyrics
+        .split("\n")
+        .filter(v=>v.trim());
+
+        showLyrics(
+            lines.map(text=>({
+                text:text
+            }))
+        );
+
+    }
+
+}
+
+    function parseLRC(lrc){
+
+    const result=[];
+
+    const rows=
+    lrc.split("\n");
+
+    rows.forEach(row=>{
+
+        const m =
+        row.match(
+        /\[(\d+):(\d+\.\d+)\](.*)/
+        );
+
+        if(!m) return;
+
+        const min =
+        parseInt(m[1]);
+
+        const sec =
+        parseFloat(m[2]);
+
+        result.push({
+
+            time:
+            min*60+sec,
+
+            text:
+            m[3].trim()
+
+        });
+
+    });
+
+    return result;
+
+}
+
+function showLyrics(lines){
+
+    document.body.innerHTML = "";
+
+    document.body.style.background =
+    "#000";
+
+    document.body.style.color =
+    "#fff";
+
+    let index = 0;
+
+    const container =
+    document.createElement("div");
+
+    container.style.padding =
+    "40px";
+
+    document.body.appendChild(
+        container
+    );
+
+    function render(){
+
+        container.innerHTML = `
+            <div style="
+                font-size:40px;
+                opacity:.5;
+            ">
+                ${lines[index+1]?.text || ""}
+            </div>
+
+            <div style="
+                font-size:80px;
+                margin:30px 0;
+                font-weight:bold;
+            ">
+                ${lines[index]?.text || ""}
+            </div>
+
+            <div style="
+                font-size:40px;
+                opacity:.3;
+            ">
+                ${lines[index+2]?.text || ""}
+            </div>
+        `;
+
+    }
+
+    render();
+
+    document.onkeydown=(e)=>{
+
+        if(e.key==="ArrowRight"){
+
+            index=
+            Math.min(
+                lines.length-1,
+                index+1
+            );
+
+            render();
+
+        }
+
+        if(e.key==="ArrowLeft"){
+
+            index=
+            Math.max(
+                0,
+                index-1
+            );
+
+            render();
+
+        }
+
+    };
+
+}
 </script>
 
 </body>
