@@ -296,55 +296,55 @@ function loadLyrics(item){
 }
 
 function showLyrics(lines){
-    
-    const originalHtml = document.body.innerHTML;
 
     document.body.innerHTML = "";
-
-    document.body.style.background =
-    "#000";
-
-    document.body.style.color =
-    "#fff";
+    document.body.style.background = "#000";
+    document.body.style.color = "#fff";
 
     let index = 0;
 
-    const container =
-    document.createElement("div");
+    const container = document.createElement("div");
+    container.style.padding = "40px";
 
-    container.style.padding =
-    "40px";
+    document.body.appendChild(container);
 
-    document.body.appendChild(
-        container
-    );
+    // ←ここに入れる
+    const youtubeUrl = prompt("YouTube URLを入力");
+    const videoId = getYoutubeId(youtubeUrl);
+
+    if(videoId){
+
+        const iframe = document.createElement("iframe");
+
+        iframe.width = "560";
+        iframe.height = "315";
+
+        iframe.src =
+            "https://www.youtube.com/embed/" + videoId;
+
+        iframe.allow =
+            "accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture";
+
+        iframe.allowFullscreen = true;
+
+        container.appendChild(iframe);
+    }
 
     function render(){
 
         container.innerHTML = `
-            <div style="
-                font-size:40px;
-                opacity:.5;
-            ">
+            <div style="font-size:40px;opacity:.5">
                 ${lines[index+1]?.text || ""}
             </div>
 
-            <div style="
-                font-size:80px;
-                margin:30px 0;
-                font-weight:bold;
-            ">
+            <div style="font-size:80px;margin:30px 0;font-weight:bold">
                 ${lines[index]?.text || ""}
             </div>
 
-            <div style="
-                font-size:40px;
-                opacity:.3;
-            ">
+            <div style="font-size:40px;opacity:.3">
                 ${lines[index+2]?.text || ""}
             </div>
         `;
-
     }
 
     render();
@@ -394,6 +394,17 @@ function showLyrics(lines){
 
 };
 
+    
+}
+
+
+function getYoutubeId(url){ //YoutubeID-GET-from-YoutubeURL
+
+    const m = url.match(
+        /(?:v=|youtu\.be\/)([^&]+)/i
+    );
+
+    return m ? m[1] : "";
 }
 </script>
 
