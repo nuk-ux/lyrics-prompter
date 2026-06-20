@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lyrics Prompter FINAL UI</title>
+<title>Lyrics Prompter Laule'a</title>
 
 <script src="https://www.youtube.com/iframe_api"></script>
 
@@ -25,6 +25,7 @@ body{
     width:100%;
     font-size:22px;
     padding:12px;
+    box-sizing:border-box;
 }
 
 .result{
@@ -40,18 +41,47 @@ body{
 
 .artist{ opacity:.7; }
 
+/* 🎥 player responsive */
+.player{
+    width:100%;
+    aspect-ratio:16/9;
+    margin-top:20px;
+}
+
+.player iframe{
+    width:100%;
+    height:100%;
+    border:0;
+}
+
+/* 🎤 lyrics */
 #lyrics{
     text-align:center;
     margin-top:40px;
+    padding:0 10px;
 }
 
+/* 🎛 controls */
 .controls{
     position:fixed;
     bottom:10px;
     left:10px;
-    color:#0f0;
-    font-size:12px;
-    opacity:0.8;
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    z-index:9999;
+}
+
+button{
+    background:#111;
+    color:#fff;
+    border:1px solid #333;
+    padding:8px 10px;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#222;
 }
 </style>
 </head>
@@ -59,12 +89,10 @@ body{
 <body>
 
 <div id="app">
-    <h1>Lyrics Prompter</h1>
+    <h1>Lyrics Prompter Laule'a</h1>
     <input id="search" placeholder="曲名 / アーティスト">
     <div id="results"></div>
 </div>
-
-<div class="controls" id="hud"></div>
 
 <script>
 
@@ -83,19 +111,8 @@ const state = {
 
 const searchBox = document.getElementById("search");
 const results = document.getElementById("results");
-const hud = document.getElementById("hud");
 
 let timer;
-
-/* =========================
-   HUD
-========================= */
-function log(){
-    hud.innerText =
-`speed: ${state.speed.toFixed(1)}
-offset: ${state.offset.toFixed(2)}
-index: ${state.index}`;
-}
 
 /* =========================
    YOUTUBE READY
@@ -105,7 +122,7 @@ window.onYouTubeIframeAPIReady = () => {
 };
 
 /* =========================
-   SEARCH iTunes
+   SEARCH (iTunes)
 ========================= */
 searchBox.addEventListener("input",()=>{
 
@@ -149,7 +166,7 @@ async function search(q){
 }
 
 /* =========================
-   LYRICS
+   LYRICS API
 ========================= */
 async function fetchLyrics(track){
 
@@ -215,23 +232,69 @@ function start(item){
 }
 
 /* =========================
-   UI
+   UI INIT
 ========================= */
 function showPlayer(){
 
     document.body.innerHTML = "";
 
     const wrap = document.createElement("div");
-    wrap.style.padding = "30px";
+    wrap.style.padding = "20px";
 
     const playerDiv = document.createElement("div");
+    playerDiv.className = "player";
+
     const lyricsDiv = document.createElement("div");
+    lyricsDiv.id = "lyrics";
 
     wrap.appendChild(playerDiv);
     wrap.appendChild(lyricsDiv);
     document.body.appendChild(wrap);
 
     state.lyricsDiv = lyricsDiv;
+
+    /* controls */
+    const controls = document.createElement("div");
+    controls.className = "controls";
+
+    controls.innerHTML = `
+        <button id="speedDown">-speed</button>
+        <button id="speedUp">+speed</button>
+        <button id="offsetDown">-offset</button>
+        <button id="offsetUp">+offset</button>
+        <button id="fullscreen">fullscreen</button>
+    `;
+
+    document.body.appendChild(controls);
+
+    /* events */
+    document.getElementById("speedUp").onclick = ()=>{
+        state.speed = Math.min(3, state.speed + 0.1);
+        log();
+    };
+
+    document.getElementById("speedDown").onclick = ()=>{
+        state.speed = Math.max(0.3, state.speed - 0.1);
+        log();
+    };
+
+    document.getElementById("offsetUp").onclick = ()=>{
+        state.offset += 0.1;
+        log();
+    };
+
+    document.getElementById("offsetDown").onclick = ()=>{
+        state.offset -= 0.1;
+        log();
+    };
+
+    document.getElementById("fullscreen").onclick = ()=>{
+        if(!document.fullscreenElement){
+            document.documentElement.requestFullscreen();
+        }else{
+            document.exitFullscreen();
+        }
+    };
 
     const url = prompt("YouTube URL（空OK）");
     const id = getYoutubeId(url);
@@ -249,12 +312,10 @@ function showPlayer(){
     }
 
     render();
-    bindKeys();
-    log();
 }
 
 /* =========================
-   SYNC
+   SYNC ENGINE
 ========================= */
 function startSync(){
 
@@ -282,7 +343,7 @@ function startSync(){
 }
 
 /* =========================
-   RENDER（UI改善版）
+   RENDER
 ========================= */
 function render(){
 
@@ -290,79 +351,30 @@ function render(){
     const l = state.lines;
 
     state.lyricsDiv.innerHTML = `
-        <div style="
-            font-size:40px;
-            opacity:0.55;
-        ">
+        <div style="font-size:40px;opacity:0.6">
             ${l[i-1]?.text || ""}
         </div>
 
         <div style="
-            font-size:82px;
-            margin:25px 0;
+            font-size:80px;
+            margin:20px 0;
             font-weight:bold;
             opacity:1;
-            text-shadow:0 0 10px rgba(255,255,255,0.25);
         ">
             ${l[i]?.text || ""}
         </div>
 
-        <div style="
-            font-size:40px;
-            opacity:0.8;
-        ">
+        <div style="font-size:40px;opacity:0.8">
             ${l[i+1]?.text || ""}
         </div>
     `;
-
-    log();
 }
 
 /* =========================
-   CONTROLS
+   LOG (simple)
 ========================= */
-function bindKeys(){
-
-    document.onkeydown = (e)=>{
-
-        if(e.key==="ArrowRight"){
-            state.index++;
-            render();
-        }
-
-        if(e.key==="ArrowLeft"){
-            state.index = Math.max(0,state.index-1);
-            render();
-        }
-
-        if(e.key==="+"){
-            state.offset += 0.1;
-            log();
-        }
-
-        if(e.key==="-"){
-            state.offset -= 0.1;
-            log();
-        }
-
-        if(e.key==="]"){
-            state.speed = Math.min(3, state.speed + 0.1);
-            log();
-        }
-
-        if(e.key==="["){
-            state.speed = Math.max(0.3, state.speed - 0.1);
-            log();
-        }
-
-        if(e.key==="f"){
-            if(!document.fullscreenElement){
-                document.documentElement.requestFullscreen();
-            }else{
-                document.exitFullscreen();
-            }
-        }
-    };
+function log(){
+    console.log("speed:", state.speed, "offset:", state.offset);
 }
 
 /* =========================
