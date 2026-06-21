@@ -15,63 +15,122 @@ body{
     font-family:sans-serif;
 }
 
-.screen{display:none;padding:20px;}
+/* screen */
+.screen{display:none;padding:10px;}
 .screen.active{display:block;}
 
-#lyricsWrap{
-    height:70vh;
-    overflow-y:auto;
-    border:1px solid #222;
+/* =========================
+   TOP
+========================= */
+#search{
+    width:100%;
+    font-size:20px;
+    padding:10px;
+    box-sizing:border-box;
 }
 
-/* 行は固定レイアウト */
+.result{
+    padding:10px;
+    border:1px solid #333;
+    margin-top:6px;
+}
+
+/* =========================
+   PLAYER LAYOUT（重要）
+========================= */
+#playerWrap{
+    display:flex;
+    justify-content:center;
+    margin-top:10px;
+}
+
+/* ★動画を小さく固定 */
+.player{
+    width:320px;
+    height:180px;
+}
+
+/* =========================
+   LYRICS AREA（拡張）
+========================= */
+#lyricsWrap{
+    height:calc(100vh - 260px);
+    overflow-y:auto;
+    border:1px solid #222;
+    margin-top:10px;
+}
+
+/* 行 */
 .line{
     text-align:center;
     padding:10px;
-    min-height:44px;
-    transition:background 0.1s;
+    min-height:42px;
 }
 
 .now{
-    font-size:58px;
+    font-size:54px;
     font-weight:bold;
-    background:#111;
 }
 
 .side{
-    font-size:28px;
+    font-size:26px;
     opacity:.35;
 }
 
-/* bottom */
+/* =========================
+   BOTTOM BAR
+========================= */
 .bottomBar{
     position:fixed;
-    bottom:10px;
-    left:10px;
-    right:10px;
+    bottom:8px;
+    left:8px;
+    right:8px;
     display:flex;
     justify-content:space-between;
+    z-index:9999;
 }
+
 button{
     background:#111;
     color:#fff;
     border:1px solid #333;
     padding:6px 10px;
 }
+
+/* warn */
+#warn{
+    position:fixed;
+    top:0;
+    left:0;
+    right:0;
+    height:24px;
+    line-height:24px;
+    font-size:12px;
+    background:rgba(255,0,0,0.8);
+    text-align:center;
+    display:none;
+}
 </style>
 </head>
 
 <body>
 
+<div id="warn"></div>
+
+<!-- TOP -->
 <div id="topScreen" class="screen active">
     <h1>Lyrics Prompter</h1>
     <input id="search">
     <div id="results"></div>
 </div>
 
+<!-- PLAYER -->
 <div id="playerScreen" class="screen">
 
+    <!-- 小さい動画 -->
     <div id="playerWrap"></div>
+
+    <!-- 歌詞メイン -->
     <div id="lyricsWrap"></div>
 
     <div class="bottomBar">
@@ -89,16 +148,14 @@ const state={
     lines:[],
     index:0,
     mode:"auto",
-    offset:0,
-    lockScroll:false
+    offset:0
 };
 
-/* ===================== RENDER（重要修正） ===================== */
+/* ================= render ================= */
 function render(){
 
     const wrap=document.getElementById("lyricsWrap");
-
-    const scrollPos = wrap.scrollTop; // ★保持
+    const scroll=wrap.scrollTop;
 
     wrap.innerHTML="";
 
@@ -114,22 +171,17 @@ function render(){
         wrap.appendChild(d);
     });
 
-    // ★AUTOのときだけスクロール制御
     if(state.mode==="auto"){
-        const target=wrap.children[state.index];
-        if(target){
-            target.scrollIntoView({
-                block:"center",
-                behavior:"smooth"
-            });
+        const el=wrap.children[state.index];
+        if(el){
+            el.scrollIntoView({block:"center",behavior:"smooth"});
         }
     }else{
-        // MANUALは絶対に触らない
-        wrap.scrollTop=scrollPos;
+        wrap.scrollTop=scroll;
     }
 }
 
-/* ===================== SYNC LOOP ===================== */
+/* ================= sync loop ================= */
 function loop(){
 
     if(state.mode!=="auto") return;
@@ -146,14 +198,10 @@ function loop(){
     }
 }
 
-/* ===================== WHEEL ===================== */
+/* ================= wheel ================= */
 document.getElementById("lyricsWrap").addEventListener("wheel",(e)=>{
 
     if(state.mode==="auto") return;
-
-    if(state.lockScroll) return;
-
-    state.lockScroll=true;
 
     const dir=e.deltaY>0?1:-1;
 
@@ -161,22 +209,7 @@ document.getElementById("lyricsWrap").addEventListener("wheel",(e)=>{
 
     render();
 
-    setTimeout(()=>state.lockScroll=false,80);
-
 },{passive:true});
-
-/* ===================== MODE ===================== */
-document.getElementById("modeBtn").onclick=()=>{
-    state.mode=state.mode==="auto"?"manual":"auto";
-    document.getElementById("modeBtn").textContent=state.mode.toUpperCase();
-};
-
-/* ===================== SYNC ===================== */
-document.getElementById("syncBtn").onclick=()=>{
-    const t=state.player.getCurrentTime();
-    const lt=state.lines[state.index]?.time;
-    state.offset=lt-t;
-};
 
 </script>
 
