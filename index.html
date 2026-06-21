@@ -19,9 +19,7 @@ body{
 .screen{display:none;padding:10px;}
 .screen.active{display:block;}
 
-/* =========================
-   TOP
-========================= */
+/* search */
 #search{
     width:100%;
     font-size:20px;
@@ -36,31 +34,33 @@ body{
 }
 
 /* =========================
-   PLAYER LAYOUT（重要）
+   PLAYER AREA（UIのみ修正）
 ========================= */
+
 #playerWrap{
     display:flex;
     justify-content:center;
     margin-top:10px;
 }
 
-/* ★動画を小さく固定 */
+/* ★動画サイズ調整（機能はそのまま） */
 .player{
-    width:320px;
-    height:180px;
+    width:360px;
+    height:202px;
+    border:1px solid #222;
 }
 
 /* =========================
-   LYRICS AREA（拡張）
+   LYRICS
 ========================= */
+
 #lyricsWrap{
-    height:calc(100vh - 260px);
+    height:calc(100vh - 300px);
     overflow-y:auto;
     border:1px solid #222;
     margin-top:10px;
 }
 
-/* 行 */
 .line{
     text-align:center;
     padding:10px;
@@ -68,7 +68,7 @@ body{
 }
 
 .now{
-    font-size:54px;
+    font-size:56px;
     font-weight:bold;
 }
 
@@ -78,8 +78,9 @@ body{
 }
 
 /* =========================
-   BOTTOM BAR
+   BOTTOM BAR（維持）
 ========================= */
+
 .bottomBar{
     position:fixed;
     bottom:8px;
@@ -95,9 +96,10 @@ button{
     color:#fff;
     border:1px solid #333;
     padding:6px 10px;
+    cursor:pointer;
 }
 
-/* warn */
+/* warn（軽量化） */
 #warn{
     position:fixed;
     top:0;
@@ -109,6 +111,7 @@ button{
     background:rgba(255,0,0,0.8);
     text-align:center;
     display:none;
+    z-index:99999;
 }
 </style>
 </head>
@@ -119,23 +122,25 @@ button{
 
 <!-- TOP -->
 <div id="topScreen" class="screen active">
-    <h1>Lyrics Prompter</h1>
-    <input id="search">
+    <h1>Lyrics Prompter Laule'a</h1>
+    <input id="search" placeholder="曲名 / アーティスト">
     <div id="results"></div>
 </div>
 
 <!-- PLAYER -->
 <div id="playerScreen" class="screen">
 
-    <!-- 小さい動画 -->
     <div id="playerWrap"></div>
-
-    <!-- 歌詞メイン -->
     <div id="lyricsWrap"></div>
 
     <div class="bottomBar">
-        <button id="modeBtn">AUTO</button>
-        <button id="syncBtn">SYNC</button>
+        <div style="display:flex;gap:6px;">
+            <button id="modeBtn">AUTO</button>
+            <button id="syncBtn">SYNC</button>
+            <button id="minusBtn">-</button>
+            <button id="plusBtn">+</button>
+        </div>
+
         <button id="backBtn">TOP</button>
     </div>
 
@@ -148,10 +153,188 @@ const state={
     lines:[],
     index:0,
     mode:"auto",
-    offset:0
+    offset:0,
+    wheelLock:false,
+    timer:null,
+    ready:false
 };
 
-/* ================= render ================= */
+/* ================= WARN ================= */
+function warn(msg){
+    const el=document.getElementById("warn");
+    el.style.display="block";
+    el.textContent="⚠ "+msg;
+
+    clearTimeout(el._t);
+    el._t=setTimeout(()=>el.style.display="none",2000);
+}
+
+/* ================= SEARCH ================= */
+const searchBox=document.getElementById("search");
+const results=document.getElementById("results");
+
+let timer;
+
+searchBox.addEventListener("input",()=>{
+    clearTimeout(timer);
+    const q=searchBox.value.trim();
+    if(q.length<2) return results.innerHTML="";
+    timer=setTimeout(()=>search(q),300);
+});
+
+async function search(q){
+
+    results.innerHTML="検索中...";
+
+    const res=await fetch(
+        "https://itunes.apple.com/search?term="
+        +encodeURIComponent(q)
+        +"&entity=song&country=JP&limit=20"
+    );
+
+    const data=await res.json();
+    results.innerHTML="";
+
+    data.results.forEach(t=>{
+        const d=document.createElement("div");
+        d.className="result";
+        d.innerHTML=`
+            <div>${t.trackName}</div>
+            <div style="opacity:.6">${t.artistName}</div>
+        `;
+        d.onclick=()=>fetchLyrics(t);
+        results.appendChild(d);
+    });
+}
+
+/* ================= LYRICS ================= */
+async function fetchLyrics(track){
+
+    results.innerHTML="歌詞取得中...";
+
+    const res=await fetch(
+        `https://lrclib.net/api/search?track_name=${encodeURIComponent(track.trackName)}&artist_name=${encodeURIComponent(track.artistName)}`
+    );
+
+    const data=await res.json();
+    results.innerHTML="";
+
+    if(!data.length){
+        warn("歌詞なし");
+        return;
+    }
+
+    data.forEach(item=>{
+        const d=document.createElement("div");
+        d.className="result";
+        d.innerHTML=`
+            <div>${item.trackName}</div>
+            <div style="opacity:.6">${item.artistName}</div>
+        `;
+        d.onclick=()=>start(item);
+        results.appendChild(d);
+    });
+}
+
+/* ================= PARSE ================= */
+function parseLRC(lrc){
+    return lrc.split("\n")
+    .map(l=>{
+        const m=l.match(/\[(\d+):(\d+\.\d+)\](.*)/);
+        if(!m) return null;
+        return {
+            time:parseInt(m[1])*60+parseFloat(m[2]),
+            text:m[3].trim()
+        };
+    })
+    .filter(Boolean);
+}
+
+/* ================= START ================= */
+function start(item){
+
+    warn(item.syncedLyrics ? "SYNC MODE" : "ESTIMATED MODE");
+
+    state.lines=item.syncedLyrics
+        ? parseLRC(item.syncedLyrics)
+        : item.plainLyrics.split("\n")
+            .filter(v=>v.trim())
+            .map((t,i)=>({time:i*3,text:t}));
+
+    buildPlayer();
+    showScreen("player");
+    render();
+}
+
+/* ================= PLAYER ================= */
+function buildPlayer(){
+
+    const wrap=document.getElementById("playerWrap");
+    wrap.innerHTML="";
+
+    const div=document.createElement("div");
+    div.className="player";
+    wrap.appendChild(div);
+
+    const url=prompt("YouTube URL");
+    const id=getYoutubeId(url);
+
+    if(state.player) state.player.destroy();
+
+    state.player=new YT.Player(div,{
+        videoId:id,
+        width:360,
+        height:202,
+        events:{
+            onReady:()=>{
+                state.ready=true;
+                state.player.playVideo();
+                startSync();
+            }
+        }
+    });
+
+    state.index=0;
+}
+
+/* ================= SYNC ================= */
+function getTime(){
+    return state.player.getCurrentTime() + state.offset;
+}
+
+function sync(){
+    const t=state.player.getCurrentTime();
+    const lt=state.lines[state.index]?.time;
+    if(lt==null) return;
+    state.offset=lt-t;
+}
+
+/* ================= LOOP ================= */
+function startSync(){
+
+    if(state.timer) clearInterval(state.timer);
+
+    state.timer=setInterval(()=>{
+
+        if(!state.ready||!state.player) return;
+
+        const t=getTime();
+
+        if(state.mode==="auto"){
+            for(let i=0;i<state.lines.length;i++){
+                const next=state.lines[i+1];
+                if(!next||next.time>t){
+                    state.index=i;
+                    render();
+                    break;
+                }
+            }
+        }
+
+    },120);
+}
+
+/* ================= RENDER ================= */
 function render(){
 
     const wrap=document.getElementById("lyricsWrap");
@@ -160,7 +343,6 @@ function render(){
     wrap.innerHTML="";
 
     state.lines.forEach((l,i)=>{
-
         const d=document.createElement("div");
         d.className="line";
 
@@ -173,35 +355,19 @@ function render(){
 
     if(state.mode==="auto"){
         const el=wrap.children[state.index];
-        if(el){
-            el.scrollIntoView({block:"center",behavior:"smooth"});
-        }
+        if(el) el.scrollIntoView({block:"center",behavior:"smooth"});
     }else{
         wrap.scrollTop=scroll;
     }
 }
 
-/* ================= sync loop ================= */
-function loop(){
-
-    if(state.mode!=="auto") return;
-
-    const t=state.player.getCurrentTime();
-
-    for(let i=0;i<state.lines.length;i++){
-        const next=state.lines[i+1];
-        if(!next||next.time>t){
-            state.index=i;
-            render();
-            break;
-        }
-    }
-}
-
-/* ================= wheel ================= */
+/* ================= WHEEL ================= */
 document.getElementById("lyricsWrap").addEventListener("wheel",(e)=>{
 
     if(state.mode==="auto") return;
+    if(state.wheelLock) return;
+
+    state.wheelLock=true;
 
     const dir=e.deltaY>0?1:-1;
 
@@ -209,7 +375,54 @@ document.getElementById("lyricsWrap").addEventListener("wheel",(e)=>{
 
     render();
 
+    setTimeout(()=>state.wheelLock=false,100);
+
 },{passive:true});
+
+/* ================= CONTROLS ================= */
+document.getElementById("modeBtn").onclick=()=>{
+    state.mode=state.mode==="auto"?"manual":"auto";
+    document.getElementById("modeBtn").textContent=state.mode.toUpperCase();
+};
+
+document.getElementById("syncBtn").onclick=sync;
+
+document.getElementById("plusBtn").onclick=()=>state.offset+=0.1;
+document.getElementById("minusBtn").onclick=()=>state.offset-=0.1;
+
+/* ================= BACK ================= */
+document.getElementById("backBtn").onclick=()=>{
+    if(state.timer) clearInterval(state.timer);
+    if(state.player) state.player.destroy();
+
+    state.player=null;
+    state.timer=null;
+    state.ready=false;
+    state.lines=[];
+    state.index=0;
+    state.offset=0;
+    state.mode="auto";
+
+    document.getElementById("lyricsWrap").innerHTML="";
+    document.getElementById("playerWrap").innerHTML="";
+    document.getElementById("warn").style.display="none";
+
+    showScreen("top");
+};
+
+/* ================= UTIL ================= */
+function getYoutubeId(url){
+    const m=url.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([a-zA-Z0-9_-]{11})/);
+    return m?m[1]:"";
+}
+
+function showScreen(n){
+    document.getElementById("topScreen").classList.remove("active");
+    document.getElementById("playerScreen").classList.remove("active");
+
+    if(n==="top") document.getElementById("topScreen").classList.add("active");
+    if(n==="player") document.getElementById("playerScreen").classList.add("active");
+}
 
 </script>
 
