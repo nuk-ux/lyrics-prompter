@@ -15,9 +15,11 @@ body{
     font-family:sans-serif;
 }
 
+/* screens */
 .screen{display:none;padding:20px;}
 .screen.active{display:block;}
 
+/* search */
 #search{
     width:100%;
     font-size:22px;
@@ -32,6 +34,7 @@ body{
 }
 .artist{opacity:.6;font-size:14px;}
 
+/* player */
 .player{
     width:100%;
     max-width:520px;
@@ -39,6 +42,7 @@ body{
     margin:20px auto;
 }
 
+/* lyrics */
 #lyricsWrap{
     height:65vh;
     overflow:auto;
@@ -62,6 +66,28 @@ body{
     opacity:.35;
 }
 
+/* TOPボタン */
+.topbar{
+    position:fixed;
+    top:10px;
+    left:10px;
+    z-index:10000;
+}
+
+/* モード表示 */
+#modeIndicator{
+    position:fixed;
+    top:10px;
+    right:10px;
+    background:#111;
+    border:1px solid #333;
+    padding:6px 10px;
+    z-index:10000;
+    cursor:pointer;
+    user-select:none;
+}
+
+/* controls */
 #controls{
     position:fixed;
     bottom:10px;
@@ -77,16 +103,9 @@ button{
     border:1px solid #333;
     padding:6px 10px;
 }
-
 button:hover{background:#222;}
 
-.topbar{
-    position:fixed;
-    top:10px;
-    left:10px;
-    z-index:999;
-}
-
+/* warning */
 #warn{
     position:fixed;
     top:0;
@@ -97,7 +116,7 @@ button:hover{background:#222;}
     padding:8px;
     text-align:center;
     display:none;
-    z-index:9999;
+    z-index:99999;
 }
 </style>
 </head>
@@ -118,7 +137,10 @@ button:hover{background:#222;}
         <button id="backBtn">← TOP</button>
     </div>
 
+    <div id="modeIndicator">AUTO</div>
+
     <div id="playerWrap"></div>
+
     <div id="lyricsWrap"></div>
 </div>
 
@@ -127,55 +149,56 @@ button:hover{background:#222;}
 <script>
 
 const state = {
-    player: null,
-    timer: null,
-    ready: false,
-    lines: [],
-    index: 0,
-    offset: 0,
-    mode: "auto"
+    player:null,
+    timer:null,
+    ready:false,
+    lines:[],
+    index:0,
+    offset:0,
+    mode:"auto",
+    scrollLock:false
 };
 
 /* ================= WARN ================= */
 function warn(msg){
-    const el = document.getElementById("warn");
-    el.style.display = "block";
-    el.textContent = "⚠ " + msg;
+    const el=document.getElementById("warn");
+    el.style.display="block";
+    el.textContent="⚠ "+msg;
 }
 
 /* ================= SEARCH ================= */
-const searchBox = document.getElementById("search");
-const results = document.getElementById("results");
+const searchBox=document.getElementById("search");
+const results=document.getElementById("results");
 
 let timer;
 
-searchBox.addEventListener("input", () => {
+searchBox.addEventListener("input",()=>{
     clearTimeout(timer);
-    const q = searchBox.value.trim();
-    if (q.length < 2) return results.innerHTML = "";
-    timer = setTimeout(() => search(q), 300);
+    const q=searchBox.value.trim();
+    if(q.length<2) return results.innerHTML="";
+    timer=setTimeout(()=>search(q),300);
 });
 
 async function search(q){
-    results.innerHTML = "検索中...";
+    results.innerHTML="検索中...";
 
-    const res = await fetch(
+    const res=await fetch(
         "https://itunes.apple.com/search?term="
-        + encodeURIComponent(q)
-        + "&entity=song&country=JP&limit=20"
+        +encodeURIComponent(q)
+        +"&entity=song&country=JP&limit=20"
     );
 
-    const data = await res.json();
-    results.innerHTML = "";
+    const data=await res.json();
+    results.innerHTML="";
 
-    data.results.forEach(t => {
-        const d = document.createElement("div");
-        d.className = "result";
-        d.innerHTML = `
+    data.results.forEach(t=>{
+        const d=document.createElement("div");
+        d.className="result";
+        d.innerHTML=`
             <div>${t.trackName}</div>
             <div class="artist">${t.artistName}</div>
         `;
-        d.onclick = () => fetchLyrics(t);
+        d.onclick=()=>fetchLyrics(t);
         results.appendChild(d);
     });
 }
@@ -183,28 +206,28 @@ async function search(q){
 /* ================= LYRICS ================= */
 async function fetchLyrics(track){
 
-    results.innerHTML = "歌詞取得中...";
+    results.innerHTML="歌詞取得中...";
 
-    const res = await fetch(
+    const res=await fetch(
         `https://lrclib.net/api/search?track_name=${encodeURIComponent(track.trackName)}&artist_name=${encodeURIComponent(track.artistName)}`
     );
 
-    const data = await res.json();
-    results.innerHTML = "";
+    const data=await res.json();
+    results.innerHTML="";
 
     if(!data.length){
-        warn("歌詞が見つかりません");
+        warn("歌詞なし");
         return;
     }
 
-    data.forEach(item => {
-        const d = document.createElement("div");
-        d.className = "result";
-        d.innerHTML = `
+    data.forEach(item=>{
+        const d=document.createElement("div");
+        d.className="result";
+        d.innerHTML=`
             <div>${item.trackName}</div>
             <div class="artist">${item.artistName}</div>
         `;
-        d.onclick = () => start(item);
+        d.onclick=()=>start(item);
         results.appendChild(d);
     });
 }
@@ -212,12 +235,12 @@ async function fetchLyrics(track){
 /* ================= PARSE ================= */
 function parseLRC(lrc){
     return lrc.split("\n")
-    .map(l => {
-        const m = l.match(/\[(\d+):(\d+\.\d+)\](.*)/);
+    .map(l=>{
+        const m=l.match(/\[(\d+):(\d+\.\d+)\](.*)/);
         if(!m) return null;
         return {
-            time: parseInt(m[1])*60 + parseFloat(m[2]),
-            text: m[3].trim()
+            time:parseInt(m[1])*60+parseFloat(m[2]),
+            text:m[3].trim()
         };
     })
     .filter(Boolean);
@@ -226,13 +249,13 @@ function parseLRC(lrc){
 /* ================= START ================= */
 function start(item){
 
-    warn(item.syncedLyrics ? "SYNCモード" : "推定モード（タイムなし）");
+    warn(item.syncedLyrics ? "SYNC MODE" : "ESTIMATED MODE");
 
-    state.lines = item.syncedLyrics
+    state.lines=item.syncedLyrics
         ? parseLRC(item.syncedLyrics)
         : item.plainLyrics.split("\n")
-            .filter(v => v.trim())
-            .map((t,i) => ({ time: i*3, text: t }));
+            .filter(v=>v.trim())
+            .map((t,i)=>({time:i*3,text:t}));
 
     buildPlayer();
     showScreen("player");
@@ -243,63 +266,58 @@ function start(item){
 /* ================= PLAYER ================= */
 function buildPlayer(){
 
-    const wrap = document.getElementById("playerWrap");
-    wrap.innerHTML = "";
+    const wrap=document.getElementById("playerWrap");
+    wrap.innerHTML="";
 
-    const div = document.createElement("div");
-    div.className = "player";
+    const div=document.createElement("div");
+    div.className="player";
     wrap.appendChild(div);
 
-    const url = prompt("YouTube URL");
-    const id = getYoutubeId(url);
+    const url=prompt("YouTube URL");
+    const id=getYoutubeId(url);
 
-    if(state.player){
-        state.player.destroy();
-        state.player = null;
-    }
+    if(state.player) state.player.destroy();
 
-    state.player = new YT.Player(div, {
-        videoId: id,
-        width: 520,
-        height: 292,
-        events: {
-            onReady: () => {
-                state.ready = true;
+    state.player=new YT.Player(div,{
+        videoId:id,
+        width:520,
+        height:292,
+        events:{
+            onReady:()=>{
+                state.ready=true;
                 state.player.playVideo();
                 startSync();
             }
         }
     });
 
-    state.index = 0;
+    state.index=0;
 }
 
 /* ================= TIME ================= */
-function getRealTime(){
+function getTime(){
     if(!state.player) return 0;
     return state.player.getCurrentTime() + state.offset;
 }
 
 /* ================= MANUAL SYNC ================= */
 function syncFromManual(){
-
     if(!state.player) return;
 
-    const t = state.player.getCurrentTime();
-    const lt = state.lines[state.index]?.time;
+    const t=state.player.getCurrentTime();
+    const lt=state.lines[state.index]?.time;
 
-    if(lt == null) return;
+    if(lt==null) return;
 
-    state.offset = lt - t;
+    state.offset=lt-t;
 }
 
 /* ================= CONTROLS ================= */
 function buildControls(){
 
-    const c = document.getElementById("controls");
+    const c=document.getElementById("controls");
 
-    c.innerHTML = `
-        <button id="mode">${state.mode}</button>
+    c.innerHTML=`
         <button id="sync">sync</button>
         <button id="up">+offset</button>
         <button id="down">-offset</button>
@@ -307,25 +325,20 @@ function buildControls(){
         <button id="next">▼</button>
     `;
 
-    document.getElementById("mode").onclick = () => {
-        state.mode = state.mode === "auto" ? "manual" : "auto";
-        document.getElementById("mode").innerText = state.mode;
-    };
+    document.getElementById("sync").onclick=syncFromManual;
+    document.getElementById("up").onclick=()=>state.offset+=0.1;
+    document.getElementById("down").onclick=()=>state.offset-=0.1;
 
-    document.getElementById("sync").onclick = syncFromManual;
-    document.getElementById("up").onclick = () => state.offset += 0.1;
-    document.getElementById("down").onclick = () => state.offset -= 0.1;
-
-    document.getElementById("prev").onclick = () => scroll(-1);
-    document.getElementById("next").onclick = () => scroll(1);
+    document.getElementById("prev").onclick=()=>scroll(-1);
+    document.getElementById("next").onclick=()=>scroll(1);
 }
 
 /* ================= SCROLL ================= */
 function scroll(d){
 
-    state.index = Math.max(0, Math.min(state.lines.length-1, state.index + d));
+    state.index=Math.max(0,Math.min(state.lines.length-1,state.index+d));
 
-    syncFromManual(); // ★重要
+    syncFromManual();
     render();
 }
 
@@ -334,99 +347,112 @@ function startSync(){
 
     if(state.timer) clearInterval(state.timer);
 
-    state.timer = setInterval(() => {
+    state.timer=setInterval(()=>{
 
-        if(!state.ready || !state.player) {
-            warn("動画同期待機中");
+        if(!state.ready||!state.player){
+            warn("動画未準備");
             return;
         }
 
-        const t = getRealTime();
+        const t=getTime();
 
-        if(isNaN(t)){
-            warn("動画時間取得失敗");
-            return;
-        }
-
-        if(state.mode === "auto"){
+        if(state.mode==="auto"){
 
             for(let i=0;i<state.lines.length;i++){
 
-                const next = state.lines[i+1];
+                const next=state.lines[i+1];
 
-                if(!next || next.time > t){
-                    state.index = i;
+                if(!next||next.time>t){
+                    state.index=i;
                     render();
                     break;
                 }
             }
         }
 
-    }, 120);
+    },100);
 }
 
 /* ================= RENDER ================= */
 function render(){
 
-    const wrap = document.getElementById("lyricsWrap");
-    wrap.innerHTML = "";
+    const wrap=document.getElementById("lyricsWrap");
+    wrap.innerHTML="";
 
-    state.lines.forEach((l,i) => {
+    state.lines.forEach((l,i)=>{
 
-        const d = document.createElement("div");
-        d.className = "line";
+        const d=document.createElement("div");
+        d.className="line";
 
-        if(i === state.index) d.classList.add("now");
+        if(i===state.index) d.classList.add("now");
         else d.classList.add("side");
 
-        d.textContent = l.text;
+        d.textContent=l.text;
         wrap.appendChild(d);
     });
 
-    const el = document.querySelector(".now");
+    const el=document.querySelector(".now");
     if(el){
-        el.scrollIntoView({block:"center", behavior:"smooth"});
+        el.scrollIntoView({block:"center",behavior:"smooth"});
     }
 }
 
-/* ================= BACK (FIXED) ================= */
-document.getElementById("backBtn").onclick = () => {
+/* ================= WHEEL SCROLL（追加） ================= */
+document.getElementById("lyricsWrap").addEventListener("wheel",(e)=>{
 
-    if(state.timer){
-        clearInterval(state.timer);
-        state.timer = null;
-    }
+    e.preventDefault();
 
-    if(state.player){
-        state.player.destroy();
-        state.player = null;
-    }
+    const dir=e.deltaY>0?1:-1;
 
-    state.ready = false;
-    state.index = 0;
-    state.offset = 0;
-    state.mode = "auto";
+    state.index=Math.max(0,Math.min(state.lines.length-1,state.index+dir));
 
-    document.getElementById("playerWrap").innerHTML = "";
-    document.getElementById("lyricsWrap").innerHTML = "";
-    document.getElementById("controls").innerHTML = "";
-    document.getElementById("warn").style.display = "none";
+    syncFromManual();
+    render();
+
+},{passive:false});
+
+/* ================= MODE UI ================= */
+const modeEl=document.getElementById("modeIndicator");
+
+modeEl.onclick=()=>{
+    state.mode=state.mode==="auto"?"manual":"auto";
+    modeEl.textContent=state.mode.toUpperCase();
+};
+
+/* ================= BACK ================= */
+document.getElementById("backBtn").onclick=()=>{
+
+    if(state.timer) clearInterval(state.timer);
+
+    if(state.player) state.player.destroy();
+
+    state.timer=null;
+    state.player=null;
+    state.ready=false;
+    state.index=0;
+    state.offset=0;
+    state.mode="auto";
+
+    document.getElementById("lyricsWrap").innerHTML="";
+    document.getElementById("playerWrap").innerHTML="";
+    document.getElementById("controls").innerHTML="";
+    document.getElementById("warn").style.display="none";
 
     showScreen("top");
 };
 
 /* ================= UTIL ================= */
 function getYoutubeId(url){
-    const m = url.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([a-zA-Z0-9_-]{11})/);
-    return m ? m[1] : "";
+    const m=url.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([a-zA-Z0-9_-]{11})/);
+    return m?m[1]:"";
 }
 
-function showScreen(name){
+function showScreen(n){
     document.getElementById("topScreen").classList.remove("active");
     document.getElementById("playerScreen").classList.remove("active");
 
-    if(name === "top") document.getElementById("topScreen").classList.add("active");
-    if(name === "player") document.getElementById("playerScreen").classList.add("active");
+    if(n==="top") document.getElementById("topScreen").classList.add("active");
+    if(n==="player") document.getElementById("playerScreen").classList.add("active");
 }
 
 </script>
