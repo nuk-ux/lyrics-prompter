@@ -15,51 +15,35 @@ body{
     font-family:sans-serif;
 }
 
-/* screens */
 .screen{display:none;padding:20px;}
 .screen.active{display:block;}
 
-/* search */
-#search{
-    width:100%;
-    font-size:22px;
-    padding:12px;
-    box-sizing:border-box;
-}
-
-.result{
-    padding:10px;
-    border:1px solid #333;
-    margin-top:8px;
-    cursor:pointer;
-}
-.artist{opacity:.6;font-size:14px;}
-
-/* player */
-.player{
-    width:100%;
-    max-width:520px;
-    aspect-ratio:16/9;
-    margin:20px auto;
-}
-
-/* lyrics */
 #lyricsWrap{
-    height:68vh;
+    height:70vh;
     overflow-y:auto;
     border:1px solid #222;
-    margin-top:20px;
 }
 
+/* 行は固定レイアウト */
 .line{
     text-align:center;
     padding:10px;
+    min-height:44px;
+    transition:background 0.1s;
 }
 
-.now{font-size:60px;font-weight:bold;}
-.side{font-size:28px;opacity:.35;}
+.now{
+    font-size:58px;
+    font-weight:bold;
+    background:#111;
+}
 
-/* bottom bar */
+.side{
+    font-size:28px;
+    opacity:.35;
+}
+
+/* bottom */
 .bottomBar{
     position:fixed;
     bottom:10px;
@@ -67,63 +51,33 @@ body{
     right:10px;
     display:flex;
     justify-content:space-between;
-    align-items:center;
-    gap:8px;
-    z-index:10000;
 }
-
 button{
     background:#111;
     color:#fff;
     border:1px solid #333;
     padding:6px 10px;
-    cursor:pointer;
-}
-
-/* warn */
-#warn{
-    position:fixed;
-    top:0;
-    left:0;
-    right:0;
-    height:26px;
-    line-height:26px;
-    background:rgba(255,0,60,0.85);
-    color:#fff;
-    font-size:12px;
-    text-align:center;
-    z-index:99999;
-    display:none;
-    pointer-events:none;
 }
 </style>
 </head>
 
 <body>
 
-<div id="warn"></div>
-
-<!-- TOP -->
 <div id="topScreen" class="screen active">
-    <h1>Lyrics Prompter Laule'a</h1>
-    <input id="search" placeholder="曲名 / アーティスト">
+    <h1>Lyrics Prompter</h1>
+    <input id="search">
     <div id="results"></div>
 </div>
 
-<!-- PLAYER -->
 <div id="playerScreen" class="screen">
 
     <div id="playerWrap"></div>
     <div id="lyricsWrap"></div>
 
     <div class="bottomBar">
-        <div style="display:flex;gap:6px;">
-            <button id="modeBtn">AUTO</button>
-            <button id="syncBtn">SYNC</button>
-            <button id="minusBtn">-</button>
-            <button id="plusBtn">+</button>
-        </div>
-        <button id="backBtn">← TOP</button>
+        <button id="modeBtn">AUTO</button>
+        <button id="syncBtn">SYNC</button>
+        <button id="backBtn">TOP</button>
     </div>
 
 </div>
@@ -132,216 +86,74 @@ button{
 
 const state={
     player:null,
-    timer:null,
-    ready:false,
     lines:[],
     index:0,
-    offset:0,
     mode:"auto",
-    wheelLock:false
+    offset:0,
+    lockScroll:false
 };
 
-/* warn */
-function warn(msg){
-    const el=document.getElementById("warn");
-    el.style.display="block";
-    el.textContent="⚠ "+msg;
-
-    clearTimeout(el._t);
-    el._t=setTimeout(()=>el.style.display="none",2000);
-}
-
-/* search */
-const searchBox=document.getElementById("search");
-const results=document.getElementById("results");
-
-let timer;
-
-searchBox.addEventListener("input",()=>{
-    clearTimeout(timer);
-    const q=searchBox.value.trim();
-    if(q.length<2) return results.innerHTML="";
-    timer=setTimeout(()=>search(q),300);
-});
-
-async function search(q){
-    results.innerHTML="検索中...";
-
-    const res=await fetch(
-        "https://itunes.apple.com/search?term="
-        +encodeURIComponent(q)
-        +"&entity=song&country=JP&limit=20"
-    );
-
-    const data=await res.json();
-    results.innerHTML="";
-
-    data.results.forEach(t=>{
-        const d=document.createElement("div");
-        d.className="result";
-        d.innerHTML=`
-            <div>${t.trackName}</div>
-            <div class="artist">${t.artistName}</div>
-        `;
-        d.onclick=()=>fetchLyrics(t);
-        results.appendChild(d);
-    });
-}
-
-/* lyrics */
-async function fetchLyrics(track){
-
-    results.innerHTML="歌詞取得中...";
-
-    const res=await fetch(
-        `https://lrclib.net/api/search?track_name=${encodeURIComponent(track.trackName)}&artist_name=${encodeURIComponent(track.artistName)}`
-    );
-
-    const data=await res.json();
-    results.innerHTML="";
-
-    if(!data.length){
-        warn("歌詞なし");
-        return;
-    }
-
-    data.forEach(item=>{
-        const d=document.createElement("div");
-        d.className="result";
-        d.innerHTML=`
-            <div>${item.trackName}</div>
-            <div class="artist">${item.artistName}</div>
-        `;
-        d.onclick=()=>start(item);
-        results.appendChild(d);
-    });
-}
-
-/* parse */
-function parseLRC(lrc){
-    return lrc.split("\n")
-    .map(l=>{
-        const m=l.match(/\[(\d+):(\d+\.\d+)\](.*)/);
-        if(!m) return null;
-        return {
-            time:parseInt(m[1])*60+parseFloat(m[2]),
-            text:m[3].trim()
-        };
-    })
-    .filter(Boolean);
-}
-
-/* start */
-function start(item){
-
-    warn(item.syncedLyrics ? "SYNC MODE" : "ESTIMATED MODE");
-
-    state.lines=item.syncedLyrics
-        ? parseLRC(item.syncedLyrics)
-        : item.plainLyrics.split("\n")
-            .filter(v=>v.trim())
-            .map((t,i)=>({time:i*3,text:t}));
-
-    buildPlayer();
-    showScreen("player");
-    render();
-}
-
-/* player */
-function buildPlayer(){
-
-    const wrap=document.getElementById("playerWrap");
-    wrap.innerHTML="";
-
-    const div=document.createElement("div");
-    div.className="player";
-    wrap.appendChild(div);
-
-    const url=prompt("YouTube URL");
-    const id=getYoutubeId(url);
-
-    if(state.player) state.player.destroy();
-
-    state.player=new YT.Player(div,{
-        videoId:id,
-        width:520,
-        height:292,
-        events:{
-            onReady:()=>{
-                state.ready=true;
-                state.player.playVideo();
-                startSync();
-            }
-        }
-    });
-
-    state.index=0;
-}
-
-/* time */
-function getTime(){
-    return state.player.getCurrentTime() + state.offset;
-}
-
-/* sync */
-function sync(){
-    const t=state.player.getCurrentTime();
-    const lt=state.lines[state.index]?.time;
-    if(lt==null) return;
-    state.offset=lt-t;
-}
-
-/* loop */
-function startSync(){
-
-    if(state.timer) clearInterval(state.timer);
-
-    state.timer=setInterval(()=>{
-
-        if(!state.ready||!state.player) return;
-
-        const t=getTime();
-
-        if(state.mode==="auto"){
-            for(let i=0;i<state.lines.length;i++){
-                const next=state.lines[i+1];
-                if(!next||next.time>t){
-                    state.index=i;
-                    render();
-                    break;
-                }
-            }
-        }
-
-    },120);
-}
-
-/* render */
+/* ===================== RENDER（重要修正） ===================== */
 function render(){
 
     const wrap=document.getElementById("lyricsWrap");
+
+    const scrollPos = wrap.scrollTop; // ★保持
+
     wrap.innerHTML="";
 
     state.lines.forEach((l,i)=>{
+
         const d=document.createElement("div");
         d.className="line";
-        d.classList.add(i===state.index?"now":"side");
+
+        if(i===state.index) d.classList.add("now");
+        else d.classList.add("side");
+
         d.textContent=l.text;
         wrap.appendChild(d);
     });
 
-    const el=document.querySelector(".now");
-    if(el) el.scrollIntoView({block:"center"});
+    // ★AUTOのときだけスクロール制御
+    if(state.mode==="auto"){
+        const target=wrap.children[state.index];
+        if(target){
+            target.scrollIntoView({
+                block:"center",
+                behavior:"smooth"
+            });
+        }
+    }else{
+        // MANUALは絶対に触らない
+        wrap.scrollTop=scrollPos;
+    }
 }
 
-/* wheel (fixed step) */
-document.addEventListener("wheel",(e)=>{
+/* ===================== SYNC LOOP ===================== */
+function loop(){
+
+    if(state.mode!=="auto") return;
+
+    const t=state.player.getCurrentTime();
+
+    for(let i=0;i<state.lines.length;i++){
+        const next=state.lines[i+1];
+        if(!next||next.time>t){
+            state.index=i;
+            render();
+            break;
+        }
+    }
+}
+
+/* ===================== WHEEL ===================== */
+document.getElementById("lyricsWrap").addEventListener("wheel",(e)=>{
 
     if(state.mode==="auto") return;
 
-    if(state.wheelLock) return;
+    if(state.lockScroll) return;
 
-    state.wheelLock=true;
+    state.lockScroll=true;
 
     const dir=e.deltaY>0?1:-1;
 
@@ -349,52 +161,22 @@ document.addEventListener("wheel",(e)=>{
 
     render();
 
-    setTimeout(()=>state.wheelLock=false,120);
+    setTimeout(()=>state.lockScroll=false,80);
 
 },{passive:true});
 
-/* controls */
+/* ===================== MODE ===================== */
 document.getElementById("modeBtn").onclick=()=>{
     state.mode=state.mode==="auto"?"manual":"auto";
     document.getElementById("modeBtn").textContent=state.mode.toUpperCase();
 };
 
-document.getElementById("syncBtn").onclick=sync;
-document.getElementById("plusBtn").onclick=()=>state.offset+=0.1;
-document.getElementById("minusBtn").onclick=()=>state.offset-=0.1;
-
-document.getElementById("backBtn").onclick=()=>{
-    if(state.timer) clearInterval(state.timer);
-    if(state.player) state.player.destroy();
-
-    state.player=null;
-    state.timer=null;
-    state.ready=false;
-    state.lines=[];
-    state.index=0;
-    state.offset=0;
-    state.mode="auto";
-
-    document.getElementById("lyricsWrap").innerHTML="";
-    document.getElementById("playerWrap").innerHTML="";
-    document.getElementById("warn").style.display="none";
-
-    showScreen("top");
+/* ===================== SYNC ===================== */
+document.getElementById("syncBtn").onclick=()=>{
+    const t=state.player.getCurrentTime();
+    const lt=state.lines[state.index]?.time;
+    state.offset=lt-t;
 };
-
-/* util */
-function getYoutubeId(url){
-    const m=url.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([a-zA-Z0-9_-]{11})/);
-    return m?m[1]:"";
-}
-
-function showScreen(n){
-    document.getElementById("topScreen").classList.remove("active");
-    document.getElementById("playerScreen").classList.remove("active");
-
-    if(n==="top") document.getElementById("topScreen").classList.add("active");
-    if(n==="player") document.getElementById("playerScreen").classList.add("active");
-}
 
 </script>
 
