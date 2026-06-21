@@ -15,7 +15,7 @@ body{margin:0;background:#000;color:#fff;font-family:sans-serif;}
 #search{width:100%;font-size:22px;padding:12px;}
 .result{padding:10px;border:1px solid #333;margin-top:8px;cursor:pointer;}
 .result:hover{background:#111;}
-.artist{opacity:.6;}
+.artist{opacity:.6;font-size:14px;}
 
 .player{width:100%;max-width:480px;aspect-ratio:16/9;margin:20px auto;}
 
@@ -24,10 +24,24 @@ body{margin:0;background:#000;color:#fff;font-family:sans-serif;}
 
 .line{text-align:center;padding:8px 0;}
 .now{font-size:60px;font-weight:bold;}
-.side{opacity:.4;font-size:28px;}
+.side{font-size:28px;opacity:.4;}
 
-#controls{position:fixed;bottom:10px;left:10px;display:flex;gap:6px;flex-wrap:wrap;}
-button{background:#111;color:#fff;border:1px solid #333;padding:6px 10px;}
+#controls{
+    position:fixed;
+    bottom:10px;
+    left:10px;
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+}
+
+button{
+    background:#111;
+    color:#fff;
+    border:1px solid #333;
+    padding:6px 10px;
+}
+
 button:hover{background:#222;}
 
 .topbar{position:fixed;top:10px;left:10px;}
@@ -69,29 +83,14 @@ const state = {
     timer:null
 };
 
-let ytReady = false;
+let ytReady=false;
 
-/* ================= YT API ================= */
-function onYouTubeIframeAPIReady(){
-    ytReady = true;
-}
-
-/* ================= UI ================= */
-const topScreen = document.getElementById("topScreen");
-const playerScreen = document.getElementById("playerScreen");
-const results = document.getElementById("results");
-const searchBox = document.getElementById("search");
+/* ================= SEARCH ================= */
+const searchBox=document.getElementById("search");
+const results=document.getElementById("results");
 
 let timer;
 
-function showScreen(s){
-    topScreen.classList.remove("active");
-    playerScreen.classList.remove("active");
-    if(s==="top") topScreen.classList.add("active");
-    if(s==="player") playerScreen.classList.add("active");
-}
-
-/* ================= SEARCH ================= */
 searchBox.addEventListener("input",()=>{
     clearTimeout(timer);
     const q=searchBox.value.trim();
@@ -101,14 +100,21 @@ searchBox.addEventListener("input",()=>{
 
 async function search(q){
     results.innerHTML="検索中...";
-    const res=await fetch("https://itunes.apple.com/search?term="+encodeURIComponent(q)+"&entity=song&country=JP&limit=20");
+    const res=await fetch(
+        "https://itunes.apple.com/search?term="
+        + encodeURIComponent(q)
+        + "&entity=song&country=JP&limit=20"
+    );
     const data=await res.json();
 
     results.innerHTML="";
     data.results.forEach(t=>{
         const d=document.createElement("div");
         d.className="result";
-        d.innerHTML=`<div>${t.trackName}</div><div class="artist">${t.artistName}</div>`;
+        d.innerHTML=`
+            <div>${t.trackName}</div>
+            <div class="artist">${t.artistName}</div>
+        `;
         d.onclick=()=>fetchLyrics(t);
         results.appendChild(d);
     });
@@ -130,7 +136,10 @@ async function fetchLyrics(track){
     data.forEach(item=>{
         const d=document.createElement("div");
         d.className="result";
-        d.innerHTML=`<div>${item.trackName}</div>`;
+        d.innerHTML=`
+            <div>${item.trackName}</div>
+            <div class="artist">${item.artistName}</div>
+        `;
         d.onclick=()=>start(item);
         results.appendChild(d);
     });
@@ -153,7 +162,7 @@ function parseLRC(lrc){
 /* ================= START ================= */
 function start(item){
 
-    state.lines = item.syncedLyrics
+    state.lines=item.syncedLyrics
         ? parseLRC(item.syncedLyrics)
         : item.plainLyrics.split("\n")
             .filter(v=>v.trim())
@@ -180,7 +189,6 @@ function buildPlayer(){
     if(state.player){
         state.player.destroy();
         state.player=null;
-        state.ready=false;
     }
 
     state.player=new YT.Player(div,{
@@ -209,10 +217,12 @@ function buildControls(){
         <button id="sync">sync</button>
         <button id="up">+offset</button>
         <button id="down">-offset</button>
+        <button id="prev">▲</button>
+        <button id="next">▼</button>
     `;
 
     document.getElementById("mode").onclick=()=>{
-        state.mode = state.mode==="auto"?"manual":"auto";
+        state.mode=state.mode==="auto"?"manual":"auto";
         document.getElementById("mode").innerText=state.mode;
     };
 
@@ -224,6 +234,20 @@ function buildControls(){
 
     document.getElementById("up").onclick=()=>state.offset+=0.1;
     document.getElementById("down").onclick=()=>state.offset-=0.1;
+
+    document.getElementById("prev").onclick=()=>scroll(-1);
+    document.getElementById("next").onclick=()=>scroll(1);
+}
+
+/* ================= SCROLL CORE ================= */
+function scroll(d){
+
+    state.index=Math.max(
+        0,
+        Math.min(state.lines.length-1,state.index+d)
+    );
+
+    render();
 }
 
 /* ================= SYNC ================= */
@@ -240,7 +264,9 @@ function startSync(){
         if(state.mode==="auto"){
 
             for(let i=0;i<state.lines.length;i++){
+
                 const next=state.lines[i+1];
+
                 if(!next||next.time>t){
                     state.index=i;
                     render();
@@ -257,15 +283,8 @@ document.onkeydown=(e)=>{
 
     if(state.mode!=="manual") return;
 
-    if(e.key==="ArrowRight"){
-        state.index=Math.min(state.lines.length-1,state.index+1);
-        render();
-    }
-
-    if(e.key==="ArrowLeft"){
-        state.index=Math.max(0,state.index-1);
-        render();
-    }
+    if(e.key==="ArrowRight") scroll(1);
+    if(e.key==="ArrowLeft") scroll(-1);
 };
 
 /* ================= RENDER ================= */
@@ -283,6 +302,7 @@ function render(){
         else d.classList.add("side");
 
         d.textContent=l.text;
+
         wrap.appendChild(d);
     });
 
@@ -308,6 +328,13 @@ document.getElementById("backBtn").onclick=()=>{
 function getYoutubeId(url){
     const m=url.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([a-zA-Z0-9_-]{11})/);
     return m?m[1]:"";
+}
+
+function showScreen(name){
+    document.getElementById("topScreen").classList.remove("active");
+    document.getElementById("playerScreen").classList.remove("active");
+    if(name==="top") document.getElementById("topScreen").classList.add("active");
+    if(name==="player") document.getElementById("playerScreen").classList.add("active");
 }
 
 </script>
