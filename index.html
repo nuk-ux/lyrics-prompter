@@ -22,6 +22,7 @@ body{
     width:100%;
     font-size:22px;
     padding:12px;
+    box-sizing:border-box;
 }
 
 .result{
@@ -48,29 +49,13 @@ body{
     min-height:200px;
 }
 
-.line{
-    transition: all 0.2s ease;
-}
-
-.now{
-    font-size:70px;
-    font-weight:bold;
-    margin:20px 0;
-}
-
-.side{
-    font-size:32px;
-    opacity:.5;
-}
-
 #controls{
     position:fixed;
     bottom:10px;
     left:10px;
     display:flex;
-    flex-wrap:wrap;
     gap:6px;
-    z-index:9999;
+    flex-wrap:wrap;
 }
 
 button{
@@ -112,16 +97,15 @@ button:hover{ background:#222; }
 
 <script>
 
-/* =========================
-   STATE
-========================= */
 const state = {
     player: null,
     lines: [],
     index: 0,
     offset: 0,
-    mode: "auto", // auto / manual
-    syncStarted: false
+    speed: 1,
+    mode: "auto",
+    syncStarted: false,
+    syncTimer: null
 };
 
 const topScreen = document.getElementById("topScreen");
@@ -131,20 +115,15 @@ const searchBox = document.getElementById("search");
 
 let timer;
 
-/* =========================
-   SCREEN
-========================= */
+/* ================= screen ================= */
 function showScreen(name){
     topScreen.classList.remove("active");
     playerScreen.classList.remove("active");
-
     if(name==="top") topScreen.classList.add("active");
     if(name==="player") playerScreen.classList.add("active");
 }
 
-/* =========================
-   SEARCH
-========================= */
+/* ================= search ================= */
 searchBox.addEventListener("input",()=>{
 
     clearTimeout(timer);
@@ -158,33 +137,17 @@ searchBox.addEventListener("input",()=>{
     timer = setTimeout(()=>search(q),300);
 });
 
-function score(track){
-
-    let s = 0;
-
-    if(/[ぁ-んァ-ン一-龥]/.test(track.trackName)) s += 2;
-    if(/[ぁ-んァ-ン一-龥]/.test(track.artistName)) s += 2;
-
-    if(/jpop|j-pop|anime|cover/i.test(track.trackName)) s += 1;
-
-    return s;
-}
-
 async function search(q){
 
     results.innerHTML = "検索中...";
 
-    const url =
-        "https://itunes.apple.com/search"
-        + "?term=" + encodeURIComponent(q)
-        + "&entity=song"
-        + "&country=JP"
-        + "&limit=30";
+    const res = await fetch(
+        "https://itunes.apple.com/search?term="
+        + encodeURIComponent(q)
+        + "&entity=song&country=JP&limit=30"
+    );
 
-    const res = await fetch(url);
     const data = await res.json();
-
-    data.results.sort((a,b)=>score(b)-score(a));
 
     results.innerHTML = "";
 
@@ -204,9 +167,7 @@ async function search(q){
     });
 }
 
-/* =========================
-   LYRICS
-========================= */
+/* ================= lyrics ================= */
 async function fetchLyrics(track){
 
     results.innerHTML = "歌詞取得中...";
@@ -235,9 +196,7 @@ async function fetchLyrics(track){
     });
 }
 
-/* =========================
-   PARSE
-========================= */
+/* ================= parse ================= */
 function parseLRC(lrc){
 
     return lrc.split("\n")
@@ -253,9 +212,7 @@ function parseLRC(lrc){
     .filter(Boolean);
 }
 
-/* =========================
-   START
-========================= */
+/* ================= start ================= */
 function start(item){
 
     state.lines = item.syncedLyrics
@@ -272,9 +229,7 @@ function start(item){
     buildControls();
 }
 
-/* =========================
-   PLAYER
-========================= */
+/* ================= player ================= */
 function buildPlayer(){
 
     const wrap = document.getElementById("playerWrap");
@@ -282,7 +237,6 @@ function buildPlayer(){
 
     const div = document.createElement("div");
     div.className = "player";
-
     wrap.appendChild(div);
 
     const url = prompt("YouTube URL");
@@ -308,17 +262,15 @@ function buildPlayer(){
     state.index = 0;
 }
 
-/* =========================
-   CONTROLS
-========================= */
+/* ================= controls ================= */
 function buildControls(){
 
     const c = document.getElementById("controls");
 
     c.innerHTML = `
-        <button id="modeBtn">${state.mode.toUpperCase()}</button>
-        <button id="offsetDown">-</button>
-        <button id="offsetUp">+</button>
+        <button id="modeBtn">${state.mode}</button>
+        <button id="speedDown">-speed</button>
+        <button id="speedUp">+speed</button>
         <button id="sync">sync</button>
         <button id="reset">reset</button>
     `;
@@ -326,13 +278,11 @@ function buildControls(){
     document.getElementById("modeBtn").onclick = ()=>{
 
         state.mode = state.mode === "auto" ? "manual" : "auto";
-
-        document.getElementById("modeBtn").innerText =
-            state.mode.toUpperCase();
+        document.getElementById("modeBtn").innerText = state.mode;
     };
 
-    document.getElementById("offsetUp").onclick = ()=> state.offset += 0.1;
-    document.getElementById("offsetDown").onclick = ()=> state.offset -= 0.1;
+    document.getElementById("speedUp").onclick = ()=> state.speed += 0.1;
+    document.getElementById("speedDown").onclick = ()=> state.speed = Math.max(0.3,state.speed-0.1);
 
     document.getElementById("sync").onclick = ()=>{
 
@@ -350,26 +300,25 @@ function buildControls(){
     };
 }
 
-/* =========================
-   SYNC LOOP
-========================= */
+/* ================= sync ================= */
 function startSync(){
 
-    if(state.syncStarted) return;
-    state.syncStarted = true;
+    if(state.syncTimer) clearInterval(state.syncTimer);
 
-    setInterval(()=>{
+    state.syncTimer = setInterval(()=>{
 
         if(!state.player) return;
 
-        const t = state.player.getCurrentTime() + state.offset;
+        const t = (state.player.getCurrentTime() * state.speed) + state.offset;
 
         if(state.mode === "auto"){
 
             for(let i=0;i<state.lines.length;i++){
 
-                if(state.lines[i].time > t){
-                    state.index = Math.max(0,i-1);
+                const next = state.lines[i+1];
+
+                if(!next || next.time > t){
+                    state.index = i;
                     render();
                     break;
                 }
@@ -379,23 +328,41 @@ function startSync(){
     },120);
 }
 
-/* =========================
-   RENDER（スムーズ版）
-========================= */
+/* ================= manual scroll ================= */
+document.onkeydown = (e)=>{
+
+    if(state.mode !== "manual") return;
+
+    if(e.key === "ArrowRight"){
+        state.index = Math.min(state.lines.length-1, state.index+1);
+        render();
+    }
+
+    if(e.key === "ArrowLeft"){
+        state.index = Math.max(0, state.index-1);
+        render();
+    }
+};
+
+/* ================= render ================= */
 function render(){
 
     const l = state.lines;
 
     document.getElementById("lyrics").innerHTML = `
-        <div class="line side">${l[state.index-1]?.text||""}</div>
-        <div class="line now">${l[state.index]?.text||""}</div>
-        <div class="line side">${l[state.index+1]?.text||""}</div>
+        <div style="opacity:.4">${l[state.index-1]?.text||""}</div>
+        <div style="font-size:60px;font-weight:bold">${l[state.index]?.text||""}</div>
+        <div style="opacity:.4">${l[state.index+1]?.text||""}</div>
     `;
 }
 
-/* =========================
-   BACK
-========================= */
+/* ================= util ================= */
+function getYoutubeId(url){
+    const m = url.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([a-zA-Z0-9_-]{11})/);
+    return m ? m[1] : "";
+}
+
+/* ================= back ================= */
 document.getElementById("backBtn").onclick = ()=>{
 
     if(state.player){
@@ -403,20 +370,11 @@ document.getElementById("backBtn").onclick = ()=>{
         state.player = null;
     }
 
-    state.syncStarted = false;
+    state.syncTimer = null;
     state.index = 0;
 
     showScreen("top");
 };
-
-/* =========================
-   UTIL
-========================= */
-function getYoutubeId(url){
-
-    const m = url.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([a-zA-Z0-9_-]{11})/);
-    return m ? m[1] : "";
-}
 
 </script>
 
