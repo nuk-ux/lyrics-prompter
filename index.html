@@ -43,12 +43,37 @@ body{
     margin:20px auto;
 }
 
-/* lyrics */
+/* =========================
+   LEFT HUD（縦配置）
+========================= */
+.topbar{
+    position:fixed;
+    top:10px;
+    left:10px;
+    z-index:10000;
+
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+}
+
+#modeIndicator{
+    background:#111;
+    border:1px solid #333;
+    padding:6px 10px;
+    text-align:center;
+    cursor:pointer;
+}
+
+/* =========================
+   lyrics area（スクロールバー操作）
+========================= */
 #lyricsWrap{
     height:65vh;
-    overflow:auto;
+    overflow-y:auto;
     border:1px solid #222;
     margin-top:20px;
+    scroll-behavior:smooth;
 }
 
 .line{
@@ -67,30 +92,6 @@ body{
     opacity:.35;
 }
 
-/* =========================
-   TOP UI（ここが修正ポイント）
-========================= */
-.topbar{
-    position:fixed;
-    top:10px;
-    left:10px;
-    z-index:10000;
-
-    display:flex;
-    flex-direction:column; /* ★縦並び */
-    gap:8px;
-}
-
-/* モード表示 */
-#modeIndicator{
-    background:#111;
-    border:1px solid #333;
-    padding:6px 10px;
-    cursor:pointer;
-    text-align:center;
-    user-select:none;
-}
-
 /* controls */
 #controls{
     position:fixed;
@@ -106,9 +107,7 @@ button{
     color:#fff;
     border:1px solid #333;
     padding:6px 10px;
-    cursor:pointer;
 }
-button:hover{background:#222;}
 
 /* warn */
 #warn{
@@ -140,13 +139,15 @@ button:hover{background:#222;}
 <!-- PLAYER -->
 <div id="playerScreen" class="screen">
 
-    <!-- TOP + MODE（縦構造） -->
+    <!-- HUD -->
     <div class="topbar">
-        <button id="backBtn">← TOP</button>
         <div id="modeIndicator">AUTO</div>
+        <button id="backBtn">← TOP</button>
     </div>
 
     <div id="playerWrap"></div>
+
+    <!-- lyrics -->
     <div id="lyricsWrap"></div>
 </div>
 
@@ -155,7 +156,6 @@ button:hover{background:#222;}
 
 <script>
 
-/* ================= STATE ================= */
 const state = {
     player:null,
     timer:null,
@@ -323,26 +323,14 @@ function buildControls(){
         <button id="sync">sync</button>
         <button id="up">+offset</button>
         <button id="down">-offset</button>
-        <button id="prev">▲</button>
-        <button id="next">▼</button>
     `;
 
     document.getElementById("sync").onclick=syncFromManual;
     document.getElementById("up").onclick=()=>state.offset+=0.1;
     document.getElementById("down").onclick=()=>state.offset-=0.1;
-
-    document.getElementById("prev").onclick=()=>scroll(-1);
-    document.getElementById("next").onclick=()=>scroll(1);
 }
 
-/* ================= SCROLL ================= */
-function scroll(d){
-    state.index=Math.max(0,Math.min(state.lines.length-1,state.index+d));
-    syncFromManual();
-    render();
-}
-
-/* ================= LOOP ================= */
+/* ================= SYNC LOOP ================= */
 function startSync(){
 
     if(state.timer) clearInterval(state.timer);
@@ -378,6 +366,7 @@ function render(){
     wrap.innerHTML="";
 
     state.lines.forEach((l,i)=>{
+
         const d=document.createElement("div");
         d.className="line";
 
@@ -390,9 +379,23 @@ function render(){
 
     const el=document.querySelector(".now");
     if(el){
-        el.scrollIntoView({block:"center",behavior:"smooth"});
+        el.scrollIntoView({block:"center"});
     }
 }
+
+/* ================= WHEEL（選択移動） ================= */
+document.addEventListener("wheel",(e)=>{
+
+    if(document.activeElement.tagName==="INPUT") return;
+
+    const dir=e.deltaY>0?1:-1;
+
+    state.index=Math.max(0,Math.min(state.lines.length-1,state.index+dir));
+
+    syncFromManual();
+    render();
+
+},{passive:true});
 
 /* ================= MODE ================= */
 const modeEl=document.getElementById("modeIndicator");
