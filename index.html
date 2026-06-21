@@ -44,7 +44,7 @@ body{
 }
 
 #lyricsWrap{
-    height:300px;
+    height:320px;
     overflow:hidden;
     margin-top:20px;
 }
@@ -64,8 +64,8 @@ body{
 }
 
 .side{
-    opacity:.4;
     font-size:28px;
+    opacity:.4;
 }
 
 #controls{
@@ -141,6 +141,7 @@ let timer;
 function showScreen(name){
     topScreen.classList.remove("active");
     playerScreen.classList.remove("active");
+
     if(name==="top") topScreen.classList.add("active");
     if(name==="player") playerScreen.classList.add("active");
 }
@@ -303,15 +304,23 @@ function buildControls(){
 
     c.innerHTML = `
         <button id="modeBtn">${state.mode}</button>
+        <button id="syncBtn">sync</button>
         <button id="offsetUp">+offset</button>
         <button id="offsetDown">-offset</button>
         <button id="reset">reset</button>
     `;
 
     document.getElementById("modeBtn").onclick = ()=>{
-
         state.mode = state.mode==="auto" ? "manual" : "auto";
         document.getElementById("modeBtn").innerText = state.mode;
+    };
+
+    document.getElementById("syncBtn").onclick = ()=>{
+
+        const t = state.player.getCurrentTime();
+        const lt = state.lines[state.index]?.time || 0;
+
+        state.offset = lt - t;
     };
 
     document.getElementById("offsetUp").onclick = ()=> state.offset += 0.1;
@@ -326,7 +335,7 @@ function buildControls(){
 }
 
 /* =========================
-   SYNC
+   SYNC LOOP
 ========================= */
 function startSync(){
 
@@ -374,7 +383,7 @@ document.onkeydown = (e)=>{
 };
 
 /* =========================
-   RENDER（スクロール式）
+   RENDER（スクロール安定版）
 ========================= */
 function render(){
 
@@ -396,7 +405,7 @@ function render(){
     });
 
     document.getElementById("lyrics").style.transform =
-        `translateY(${-state.index * 80}px)`;
+        `translateY(${-state.index * 70}px)`;
 }
 
 /* =========================
