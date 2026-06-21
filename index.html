@@ -156,7 +156,8 @@ const state={
     offset:0,
     wheelLock:false,
     timer:null,
-    ready:false
+    ready:false,
+    lineEls:[]
 };
 
 /* ================= WARN ================= */
@@ -263,6 +264,7 @@ function start(item){
 
     buildPlayer();
     showScreen("player");
+    initLyrics();
     render();
 }
 
@@ -334,30 +336,56 @@ function startSync(){
     },120);
 }
 
-/* ================= RENDER ================= */
-function render(){
+function initLyrics(){
 
     const wrap=document.getElementById("lyricsWrap");
-    const scroll=wrap.scrollTop;
 
     wrap.innerHTML="";
 
+    state.lineEls=[];
+
     state.lines.forEach((l,i)=>{
+
         const d=document.createElement("div");
-        d.className="line";
 
-        if(i===state.index) d.classList.add("now");
-        else d.classList.add("side");
-
+        d.className="line side";
         d.textContent=l.text;
+
         wrap.appendChild(d);
+
+        state.lineEls.push(d);
     });
+}
+    
+/* ================= RENDER ================= */
+function render(){
+
+    if(!state.lineEls.length) return;
+
+    for(let i=0;i<state.lineEls.length;i++){
+
+        const el=state.lineEls[i];
+
+        el.classList.remove("now","side");
+
+        if(i===state.index){
+            el.classList.add("now");
+        }else{
+            el.classList.add("side");
+        }
+    }
 
     if(state.mode==="auto"){
-        const el=wrap.children[state.index];
-        if(el) el.scrollIntoView({block:"center",behavior:"smooth"});
-    }else{
-        wrap.scrollTop=scroll;
+
+        const el=state.lineEls[state.index];
+
+        if(el){
+
+            el.scrollIntoView({
+                block:"center",
+                behavior:"smooth"
+            });
+        }
     }
 }
 
@@ -373,6 +401,17 @@ document.getElementById("lyricsWrap").addEventListener("wheel",(e)=>{
 
     state.index=Math.max(0,Math.min(state.lines.length-1,state.index+dir));
 
+    if(state.player && state.mode==="manual"){
+
+        const t=state.player.getCurrentTime();
+
+        const lt=state.lines[state.index]?.time;
+
+        if(lt!=null){
+            state.offset = lt - t;
+        }
+    }
+    
     render();
 
     setTimeout(()=>state.wheelLock=false,100);
@@ -387,8 +426,43 @@ document.getElementById("modeBtn").onclick=()=>{
 
 document.getElementById("syncBtn").onclick=sync;
 
-document.getElementById("plusBtn").onclick=()=>state.offset+=0.1;
-document.getElementById("minusBtn").onclick=()=>state.offset-=0.1;
+document.getElementById("plusBtn").onclick=()=>{
+
+    if(state.mode==="auto"){
+
+        state.index=Math.min(
+            state.lines.length-1,
+            state.index+1
+        );
+
+        sync();
+
+        render();
+
+    }else{
+
+        state.offset+=0.1;
+    }
+};
+
+document.getElementById("minusBtn").onclick=()=>{
+
+    if(state.mode==="auto"){
+
+        state.index=Math.max(
+            0,
+            state.index-1
+        );
+
+        sync();
+
+        render();
+
+    }else{
+
+        state.offset-=0.1;
+    }
+};
 
 /* ================= BACK ================= */
 document.getElementById("backBtn").onclick=()=>{
