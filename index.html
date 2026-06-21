@@ -9,22 +9,50 @@
 
 <style>
 body{margin:0;background:#000;color:#fff;font-family:sans-serif;}
+
 .screen{display:none;padding:20px;}
 .screen.active{display:block;}
 
 #search{width:100%;font-size:22px;padding:12px;}
-.result{padding:10px;border:1px solid #333;margin-top:8px;cursor:pointer;}
+
+.result{
+    padding:10px;
+    border:1px solid #333;
+    margin-top:8px;
+    cursor:pointer;
+}
+
 .result:hover{background:#111;}
 .artist{opacity:.6;font-size:14px;}
 
-.player{width:100%;max-width:480px;aspect-ratio:16/9;margin:20px auto;}
+.player{
+    width:100%;
+    max-width:480px;
+    aspect-ratio:16/9;
+    margin:20px auto;
+}
 
-#lyricsWrap{height:320px;overflow:hidden;margin-top:20px;}
-#lyrics{transition:transform .2s ease;}
+#lyricsWrap{
+    height:320px;
+    overflow:auto;
+    border:1px solid #222;
+    margin-top:20px;
+}
 
-.line{text-align:center;padding:8px 0;}
-.now{font-size:60px;font-weight:bold;}
-.side{font-size:28px;opacity:.4;}
+.line{
+    text-align:center;
+    padding:10px;
+}
+
+.now{
+    font-size:60px;
+    font-weight:bold;
+}
+
+.side{
+    font-size:28px;
+    opacity:.4;
+}
 
 #controls{
     position:fixed;
@@ -64,50 +92,51 @@ button:hover{background:#222;}
 
     <div id="playerWrap"></div>
 
-    <div id="lyricsWrap">
-        <div id="lyrics"></div>
-    </div>
+    <div id="lyricsWrap"></div>
 </div>
 
 <div id="controls"></div>
 
 <script>
 
-const state = {
+const state={
     player:null,
     ready:false,
     lines:[],
     index:0,
     offset:0,
     mode:"auto",
-    timer:null
+    timer:null,
+    userScroll:false
 };
 
-let ytReady=false;
+let wheelLock=false;
 
 /* ================= SEARCH ================= */
 const searchBox=document.getElementById("search");
 const results=document.getElementById("results");
 
-let timer;
-
 searchBox.addEventListener("input",()=>{
-    clearTimeout(timer);
+    clearTimeout(state.timer);
     const q=searchBox.value.trim();
     if(q.length<2){results.innerHTML="";return;}
-    timer=setTimeout(()=>search(q),300);
+    state.timer=setTimeout(()=>search(q),300);
 });
 
 async function search(q){
+
     results.innerHTML="検索中...";
+
     const res=await fetch(
         "https://itunes.apple.com/search?term="
         + encodeURIComponent(q)
         + "&entity=song&country=JP&limit=20"
     );
+
     const data=await res.json();
 
     results.innerHTML="";
+
     data.results.forEach(t=>{
         const d=document.createElement("div");
         d.className="result";
@@ -171,6 +200,7 @@ function start(item){
     buildPlayer();
     showScreen("player");
     buildControls();
+    render();
 }
 
 /* ================= PLAYER ================= */
@@ -188,7 +218,6 @@ function buildPlayer(){
 
     if(state.player){
         state.player.destroy();
-        state.player=null;
     }
 
     state.player=new YT.Player(div,{
@@ -232,8 +261,15 @@ function buildControls(){
         state.offset=lt-t;
     };
 
-    document.getElementById("up").onclick=()=>state.offset+=0.1;
-    document.getElementById("down").onclick=()=>state.offset-=0.1;
+    document.getElementById("up").onclick=()=>{
+        state.offset+=0.1;
+        state.mode="manual"; // ★補正入ったらmanual扱い
+    };
+
+    document.getElementById("down").onclick=()=>{
+        state.offset-=0.1;
+        state.mode="manual";
+    };
 
     document.getElementById("prev").onclick=()=>scroll(-1);
     document.getElementById("next").onclick=()=>scroll(1);
@@ -242,13 +278,20 @@ function buildControls(){
 /* ================= SCROLL CORE ================= */
 function scroll(d){
 
-    state.index=Math.max(
-        0,
-        Math.min(state.lines.length-1,state.index+d)
-    );
+    state.index=Math.max(0,Math.min(state.lines.length-1,state.index+d));
+
+    state.userScroll=true; // ★重要
 
     render();
+    scrollIntoView();
 }
+
+/* ================= WHEEL SUPPORT ================= */
+document.getElementById("lyricsWrap").addEventListener("wheel",(e)=>{
+
+    if(e.deltaY>0) scroll(1);
+    else scroll(-1);
+});
 
 /* ================= SYNC ================= */
 function startSync(){
@@ -270,6 +313,7 @@ function startSync(){
                 if(!next||next.time>t){
                     state.index=i;
                     render();
+                    scrollIntoView();
                     break;
                 }
             }
@@ -278,19 +322,10 @@ function startSync(){
     },100);
 }
 
-/* ================= KEY ================= */
-document.onkeydown=(e)=>{
-
-    if(state.mode!=="manual") return;
-
-    if(e.key==="ArrowRight") scroll(1);
-    if(e.key==="ArrowLeft") scroll(-1);
-};
-
 /* ================= RENDER ================= */
 function render(){
 
-    const wrap=document.getElementById("lyrics");
+    const wrap=document.getElementById("lyricsWrap");
     wrap.innerHTML="";
 
     state.lines.forEach((l,i)=>{
@@ -305,19 +340,23 @@ function render(){
 
         wrap.appendChild(d);
     });
+}
 
-    document.getElementById("lyrics").style.transform=
-        `translateY(${-state.index*70}px)`;
+/* ================= SCROLL POSITION ================= */
+function scrollIntoView(){
+
+    const el=document.querySelectorAll(".line")[state.index];
+    if(el){
+        el.scrollIntoView({block:"center",behavior:"smooth"});
+    }
 }
 
 /* ================= BACK ================= */
 document.getElementById("backBtn").onclick=()=>{
 
-    if(state.player){
-        state.player.destroy();
-        state.player=null;
-    }
+    if(state.player) state.player.destroy();
 
+    state.player=null;
     state.ready=false;
     state.index=0;
 
