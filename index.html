@@ -59,7 +59,7 @@ body{
 .now{font-size:60px;font-weight:bold;}
 .side{font-size:28px;opacity:.35;}
 
-/* bottom UI */
+/* bottom bar */
 .bottomBar{
     position:fixed;
     bottom:10px;
@@ -86,18 +86,13 @@ button{
     top:0;
     left:0;
     right:0;
-
     height:26px;
     line-height:26px;
-
     background:rgba(255,0,60,0.85);
     color:#fff;
-
     font-size:12px;
     text-align:center;
-
     z-index:99999;
-
     display:none;
     pointer-events:none;
 }
@@ -121,7 +116,6 @@ button{
     <div id="playerWrap"></div>
     <div id="lyricsWrap"></div>
 
-    <!-- bottom HUD -->
     <div class="bottomBar">
         <div style="display:flex;gap:6px;">
             <button id="modeBtn">AUTO</button>
@@ -129,7 +123,6 @@ button{
             <button id="minusBtn">-</button>
             <button id="plusBtn">+</button>
         </div>
-
         <button id="backBtn">← TOP</button>
     </div>
 
@@ -144,7 +137,8 @@ const state={
     lines:[],
     index:0,
     offset:0,
-    mode:"auto"
+    mode:"auto",
+    wheelLock:false
 };
 
 /* warn */
@@ -152,6 +146,9 @@ function warn(msg){
     const el=document.getElementById("warn");
     el.style.display="block";
     el.textContent="⚠ "+msg;
+
+    clearTimeout(el._t);
+    el._t=setTimeout(()=>el.style.display="none",2000);
 }
 
 /* search */
@@ -168,7 +165,6 @@ searchBox.addEventListener("input",()=>{
 });
 
 async function search(q){
-
     results.innerHTML="検索中...";
 
     const res=await fetch(
@@ -295,33 +291,14 @@ function sync(){
     state.offset=lt-t;
 }
 
-/* controls */
-document.getElementById("modeBtn").onclick=()=>{
-    state.mode=state.mode==="auto"?"manual":"auto";
-    document.getElementById("modeBtn").textContent=state.mode.toUpperCase();
-};
-
-document.getElementById("syncBtn").onclick=sync;
-
-document.getElementById("plusBtn").onclick=()=>{
-    state.offset+=0.1;
-};
-
-document.getElementById("minusBtn").onclick=()=>{
-    state.offset-=0.1;
-};
-
-/* sync loop */
+/* loop */
 function startSync(){
 
     if(state.timer) clearInterval(state.timer);
 
     state.timer=setInterval(()=>{
 
-        if(!state.ready||!state.player){
-            warn("動画未準備");
-            return;
-        }
+        if(!state.ready||!state.player) return;
 
         const t=getTime();
 
@@ -346,13 +323,9 @@ function render(){
     wrap.innerHTML="";
 
     state.lines.forEach((l,i)=>{
-
         const d=document.createElement("div");
         d.className="line";
-
-        if(i===state.index) d.classList.add("now");
-        else d.classList.add("side");
-
+        d.classList.add(i===state.index?"now":"side");
         d.textContent=l.text;
         wrap.appendChild(d);
     });
@@ -361,10 +334,14 @@ function render(){
     if(el) el.scrollIntoView({block:"center"});
 }
 
-/* wheel */
+/* wheel (fixed step) */
 document.addEventListener("wheel",(e)=>{
 
     if(state.mode==="auto") return;
+
+    if(state.wheelLock) return;
+
+    state.wheelLock=true;
 
     const dir=e.deltaY>0?1:-1;
 
@@ -372,23 +349,31 @@ document.addEventListener("wheel",(e)=>{
 
     render();
 
+    setTimeout(()=>state.wheelLock=false,120);
+
 },{passive:true});
 
-/* back */
-document.getElementById("backBtn").onclick=()=>{
+/* controls */
+document.getElementById("modeBtn").onclick=()=>{
+    state.mode=state.mode==="auto"?"manual":"auto";
+    document.getElementById("modeBtn").textContent=state.mode.toUpperCase();
+};
 
+document.getElementById("syncBtn").onclick=sync;
+document.getElementById("plusBtn").onclick=()=>state.offset+=0.1;
+document.getElementById("minusBtn").onclick=()=>state.offset-=0.1;
+
+document.getElementById("backBtn").onclick=()=>{
     if(state.timer) clearInterval(state.timer);
     if(state.player) state.player.destroy();
 
-    state={
-        player:null,
-        timer:null,
-        ready:false,
-        lines:[],
-        index:0,
-        offset:0,
-        mode:"auto"
-    };
+    state.player=null;
+    state.timer=null;
+    state.ready=false;
+    state.lines=[];
+    state.index=0;
+    state.offset=0;
+    state.mode="auto";
 
     document.getElementById("lyricsWrap").innerHTML="";
     document.getElementById("playerWrap").innerHTML="";
