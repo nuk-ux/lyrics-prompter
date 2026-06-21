@@ -43,37 +43,12 @@ body{
     margin:20px auto;
 }
 
-/* =========================
-   LEFT HUD（縦配置）
-========================= */
-.topbar{
-    position:fixed;
-    top:10px;
-    left:10px;
-    z-index:10000;
-
-    display:flex;
-    flex-direction:column;
-    gap:8px;
-}
-
-#modeIndicator{
-    background:#111;
-    border:1px solid #333;
-    padding:6px 10px;
-    text-align:center;
-    cursor:pointer;
-}
-
-/* =========================
-   lyrics area（スクロールバー操作）
-========================= */
+/* lyrics */
 #lyricsWrap{
-    height:65vh;
+    height:68vh;
     overflow-y:auto;
     border:1px solid #222;
     margin-top:20px;
-    scroll-behavior:smooth;
 }
 
 .line{
@@ -92,22 +67,31 @@ body{
     opacity:.35;
 }
 
-/* controls */
-#controls{
+/* =========================
+   BOTTOM HUD（ここが正解）
+========================= */
+.bottomBar{
     position:fixed;
     bottom:10px;
     left:10px;
+    right:10px;
+
     display:flex;
-    flex-wrap:wrap;
-    gap:6px;
+    justify-content:space-between;
+    align-items:center;
+
+    z-index:10000;
 }
 
 button{
     background:#111;
     color:#fff;
     border:1px solid #333;
-    padding:6px 10px;
+    padding:6px 12px;
+    cursor:pointer;
 }
+
+button:hover{background:#222;}
 
 /* warn */
 #warn{
@@ -139,20 +123,17 @@ button{
 <!-- PLAYER -->
 <div id="playerScreen" class="screen">
 
-    <!-- HUD -->
-    <div class="topbar">
-        <div id="modeIndicator">AUTO</div>
+    <div id="playerWrap"></div>
+
+    <div id="lyricsWrap"></div>
+
+    <!-- ★BOTTOM HUD（最重要修正） -->
+    <div class="bottomBar">
+        <button id="modeBtn">AUTO</button>
         <button id="backBtn">← TOP</button>
     </div>
 
-    <div id="playerWrap"></div>
-
-    <!-- lyrics -->
-    <div id="lyricsWrap"></div>
 </div>
-
-<!-- controls -->
-<div id="controls"></div>
 
 <script>
 
@@ -187,6 +168,7 @@ searchBox.addEventListener("input",()=>{
 });
 
 async function search(q){
+
     results.innerHTML="検索中...";
 
     const res=await fetch(
@@ -266,7 +248,6 @@ function start(item){
 
     buildPlayer();
     showScreen("player");
-    buildControls();
     render();
 }
 
@@ -312,22 +293,6 @@ function syncFromManual(){
     const lt=state.lines[state.index]?.time;
     if(lt==null) return;
     state.offset=lt-t;
-}
-
-/* ================= CONTROLS ================= */
-function buildControls(){
-
-    const c=document.getElementById("controls");
-
-    c.innerHTML=`
-        <button id="sync">sync</button>
-        <button id="up">+offset</button>
-        <button id="down">-offset</button>
-    `;
-
-    document.getElementById("sync").onclick=syncFromManual;
-    document.getElementById("up").onclick=()=>state.offset+=0.1;
-    document.getElementById("down").onclick=()=>state.offset-=0.1;
 }
 
 /* ================= SYNC LOOP ================= */
@@ -383,10 +348,10 @@ function render(){
     }
 }
 
-/* ================= WHEEL（選択移動） ================= */
+/* ================= WHEEL（AUTO無効化） ================= */
 document.addEventListener("wheel",(e)=>{
 
-    if(document.activeElement.tagName==="INPUT") return;
+    if(state.mode==="auto") return; // ★重要：AUTOでは無効
 
     const dir=e.deltaY>0?1:-1;
 
@@ -398,11 +363,9 @@ document.addEventListener("wheel",(e)=>{
 },{passive:true});
 
 /* ================= MODE ================= */
-const modeEl=document.getElementById("modeIndicator");
-
-modeEl.onclick=()=>{
+document.getElementById("modeBtn").onclick=()=>{
     state.mode=state.mode==="auto"?"manual":"auto";
-    modeEl.textContent=state.mode.toUpperCase();
+    document.getElementById("modeBtn").textContent=state.mode.toUpperCase();
 };
 
 /* ================= BACK ================= */
@@ -420,7 +383,6 @@ document.getElementById("backBtn").onclick=()=>{
 
     document.getElementById("lyricsWrap").innerHTML="";
     document.getElementById("playerWrap").innerHTML="";
-    document.getElementById("controls").innerHTML="";
     document.getElementById("warn").style.display="none";
 
     showScreen("top");
