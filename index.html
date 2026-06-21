@@ -39,7 +39,6 @@ body{
     margin:20px auto;
 }
 
-/* lyrics */
 #lyricsWrap{
     height:65vh;
     overflow:auto;
@@ -63,7 +62,6 @@ body{
     opacity:.35;
 }
 
-/* controls */
 #controls{
     position:fixed;
     bottom:10px;
@@ -79,17 +77,34 @@ button{
     border:1px solid #333;
     padding:6px 10px;
 }
+
 button:hover{background:#222;}
 
 .topbar{
     position:fixed;
     top:10px;
     left:10px;
+    z-index:999;
+}
+
+#warn{
+    position:fixed;
+    top:0;
+    left:0;
+    right:0;
+    background:#ff0033;
+    color:#fff;
+    padding:8px;
+    text-align:center;
+    display:none;
+    z-index:9999;
 }
 </style>
 </head>
 
 <body>
+
+<div id="warn"></div>
 
 <div id="topScreen" class="screen active">
     <h1>Lyrics Prompter Laule'a</h1>
@@ -104,7 +119,6 @@ button:hover{background:#222;}
     </div>
 
     <div id="playerWrap"></div>
-
     <div id="lyricsWrap"></div>
 </div>
 
@@ -114,13 +128,20 @@ button:hover{background:#222;}
 
 const state = {
     player: null,
+    timer: null,
     ready: false,
     lines: [],
     index: 0,
     offset: 0,
-    mode: "auto",
-    timer: null
+    mode: "auto"
 };
+
+/* ================= WARN ================= */
+function warn(msg){
+    const el = document.getElementById("warn");
+    el.style.display = "block";
+    el.textContent = "⚠ " + msg;
+}
 
 /* ================= SEARCH ================= */
 const searchBox = document.getElementById("search");
@@ -145,7 +166,6 @@ async function search(q){
     );
 
     const data = await res.json();
-
     results.innerHTML = "";
 
     data.results.forEach(t => {
@@ -170,8 +190,12 @@ async function fetchLyrics(track){
     );
 
     const data = await res.json();
-
     results.innerHTML = "";
+
+    if(!data.length){
+        warn("歌詞が見つかりません");
+        return;
+    }
 
     data.forEach(item => {
         const d = document.createElement("div");
@@ -190,9 +214,9 @@ function parseLRC(lrc){
     return lrc.split("\n")
     .map(l => {
         const m = l.match(/\[(\d+):(\d+\.\d+)\](.*)/);
-        if (!m) return null;
+        if(!m) return null;
         return {
-            time: parseInt(m[1]) * 60 + parseFloat(m[2]),
+            time: parseInt(m[1])*60 + parseFloat(m[2]),
             text: m[3].trim()
         };
     })
@@ -202,11 +226,13 @@ function parseLRC(lrc){
 /* ================= START ================= */
 function start(item){
 
+    warn(item.syncedLyrics ? "SYNCモード" : "推定モード（タイムなし）");
+
     state.lines = item.syncedLyrics
         ? parseLRC(item.syncedLyrics)
         : item.plainLyrics.split("\n")
             .filter(v => v.trim())
-            .map((t,i) => ({ time: i * 3, text: t }));
+            .map((t,i) => ({ time: i*3, text: t }));
 
     buildPlayer();
     showScreen("player");
@@ -227,7 +253,10 @@ function buildPlayer(){
     const url = prompt("YouTube URL");
     const id = getYoutubeId(url);
 
-    if(state.player) state.player.destroy();
+    if(state.player){
+        state.player.destroy();
+        state.player = null;
+    }
 
     state.player = new YT.Player(div, {
         videoId: id,
@@ -245,13 +274,16 @@ function buildPlayer(){
     state.index = 0;
 }
 
-/* ================= SYNC CORE ================= */
+/* ================= TIME ================= */
 function getRealTime(){
+    if(!state.player) return 0;
     return state.player.getCurrentTime() + state.offset;
 }
 
 /* ================= MANUAL SYNC ================= */
 function syncFromManual(){
+
+    if(!state.player) return;
 
     const t = state.player.getCurrentTime();
     const lt = state.lines[state.index]?.time;
@@ -280,10 +312,7 @@ function buildControls(){
         document.getElementById("mode").innerText = state.mode;
     };
 
-    document.getElementById("sync").onclick = () => {
-        syncFromManual();
-    };
-
+    document.getElementById("sync").onclick = syncFromManual;
     document.getElementById("up").onclick = () => state.offset += 0.1;
     document.getElementById("down").onclick = () => state.offset -= 0.1;
 
@@ -294,12 +323,9 @@ function buildControls(){
 /* ================= SCROLL ================= */
 function scroll(d){
 
-    state.index = Math.max(
-        0,
-        Math.min(state.lines.length - 1, state.index + d)
-    );
+    state.index = Math.max(0, Math.min(state.lines.length-1, state.index + d));
 
-    syncFromManual();   // ★ここが本体
+    syncFromManual(); // ★重要
     render();
 }
 
@@ -310,9 +336,17 @@ function startSync(){
 
     state.timer = setInterval(() => {
 
-        if(!state.ready || !state.player) return;
+        if(!state.ready || !state.player) {
+            warn("動画同期待機中");
+            return;
+        }
 
         const t = getRealTime();
+
+        if(isNaN(t)){
+            warn("動画時間取得失敗");
+            return;
+        }
 
         if(state.mode === "auto"){
 
@@ -328,7 +362,7 @@ function startSync(){
             }
         }
 
-    }, 100);
+    }, 120);
 }
 
 /* ================= RENDER ================= */
@@ -355,16 +389,30 @@ function render(){
     }
 }
 
-/* ================= BACK ================= */
+/* ================= BACK (FIXED) ================= */
 document.getElementById("backBtn").onclick = () => {
 
-    if(state.player) state.player.destroy();
+    if(state.timer){
+        clearInterval(state.timer);
+        state.timer = null;
+    }
 
-    state.player = null;
+    if(state.player){
+        state.player.destroy();
+        state.player = null;
+    }
+
     state.ready = false;
     state.index = 0;
     state.offset = 0;
     state.mode = "auto";
+
+    document.getElementById("playerWrap").innerHTML = "";
+    document.getElementById("lyricsWrap").innerHTML = "";
+    document.getElementById("controls").innerHTML = "";
+    document.getElementById("warn").style.display = "none";
+
+    showScreen("top");
 };
 
 /* ================= UTIL ================= */
