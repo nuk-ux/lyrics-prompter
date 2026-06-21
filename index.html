@@ -54,32 +54,21 @@ body{
 .line{
     text-align:center;
     padding:10px;
-    min-height:40px;
 }
 
-.now{
-    font-size:60px;
-    font-weight:bold;
-}
+.now{font-size:60px;font-weight:bold;}
+.side{font-size:28px;opacity:.35;}
 
-.side{
-    font-size:28px;
-    opacity:.35;
-}
-
-/* =========================
-   BOTTOM HUD（ここが正解）
-========================= */
+/* bottom UI */
 .bottomBar{
     position:fixed;
     bottom:10px;
     left:10px;
     right:10px;
-
     display:flex;
     justify-content:space-between;
     align-items:center;
-
+    gap:8px;
     z-index:10000;
 }
 
@@ -87,11 +76,9 @@ button{
     background:#111;
     color:#fff;
     border:1px solid #333;
-    padding:6px 12px;
+    padding:6px 10px;
     cursor:pointer;
 }
-
-button:hover{background:#222;}
 
 /* warn */
 #warn{
@@ -124,12 +111,17 @@ button:hover{background:#222;}
 <div id="playerScreen" class="screen">
 
     <div id="playerWrap"></div>
-
     <div id="lyricsWrap"></div>
 
-    <!-- ★BOTTOM HUD（最重要修正） -->
+    <!-- bottom HUD -->
     <div class="bottomBar">
-        <button id="modeBtn">AUTO</button>
+        <div style="display:flex;gap:6px;">
+            <button id="modeBtn">AUTO</button>
+            <button id="syncBtn">SYNC</button>
+            <button id="minusBtn">-</button>
+            <button id="plusBtn">+</button>
+        </div>
+
         <button id="backBtn">← TOP</button>
     </div>
 
@@ -137,7 +129,7 @@ button:hover{background:#222;}
 
 <script>
 
-const state = {
+const state={
     player:null,
     timer:null,
     ready:false,
@@ -147,14 +139,14 @@ const state = {
     mode:"auto"
 };
 
-/* ================= WARN ================= */
+/* warn */
 function warn(msg){
     const el=document.getElementById("warn");
     el.style.display="block";
     el.textContent="⚠ "+msg;
 }
 
-/* ================= SEARCH ================= */
+/* search */
 const searchBox=document.getElementById("search");
 const results=document.getElementById("results");
 
@@ -192,7 +184,7 @@ async function search(q){
     });
 }
 
-/* ================= LYRICS ================= */
+/* lyrics */
 async function fetchLyrics(track){
 
     results.innerHTML="歌詞取得中...";
@@ -221,7 +213,7 @@ async function fetchLyrics(track){
     });
 }
 
-/* ================= PARSE ================= */
+/* parse */
 function parseLRC(lrc){
     return lrc.split("\n")
     .map(l=>{
@@ -235,7 +227,7 @@ function parseLRC(lrc){
     .filter(Boolean);
 }
 
-/* ================= START ================= */
+/* start */
 function start(item){
 
     warn(item.syncedLyrics ? "SYNC MODE" : "ESTIMATED MODE");
@@ -251,7 +243,7 @@ function start(item){
     render();
 }
 
-/* ================= PLAYER ================= */
+/* player */
 function buildPlayer(){
 
     const wrap=document.getElementById("playerWrap");
@@ -282,20 +274,36 @@ function buildPlayer(){
     state.index=0;
 }
 
-/* ================= TIME ================= */
+/* time */
 function getTime(){
     return state.player.getCurrentTime() + state.offset;
 }
 
-/* ================= SYNC ================= */
-function syncFromManual(){
+/* sync */
+function sync(){
     const t=state.player.getCurrentTime();
     const lt=state.lines[state.index]?.time;
     if(lt==null) return;
     state.offset=lt-t;
 }
 
-/* ================= SYNC LOOP ================= */
+/* controls */
+document.getElementById("modeBtn").onclick=()=>{
+    state.mode=state.mode==="auto"?"manual":"auto";
+    document.getElementById("modeBtn").textContent=state.mode.toUpperCase();
+};
+
+document.getElementById("syncBtn").onclick=sync;
+
+document.getElementById("plusBtn").onclick=()=>{
+    state.offset+=0.1;
+};
+
+document.getElementById("minusBtn").onclick=()=>{
+    state.offset-=0.1;
+};
+
+/* sync loop */
 function startSync(){
 
     if(state.timer) clearInterval(state.timer);
@@ -310,7 +318,6 @@ function startSync(){
         const t=getTime();
 
         if(state.mode==="auto"){
-
             for(let i=0;i<state.lines.length;i++){
                 const next=state.lines[i+1];
                 if(!next||next.time>t){
@@ -324,7 +331,7 @@ function startSync(){
     },120);
 }
 
-/* ================= RENDER ================= */
+/* render */
 function render(){
 
     const wrap=document.getElementById("lyricsWrap");
@@ -343,43 +350,37 @@ function render(){
     });
 
     const el=document.querySelector(".now");
-    if(el){
-        el.scrollIntoView({block:"center"});
-    }
+    if(el) el.scrollIntoView({block:"center"});
 }
 
-/* ================= WHEEL（AUTO無効化） ================= */
+/* wheel */
 document.addEventListener("wheel",(e)=>{
 
-    if(state.mode==="auto") return; // ★重要：AUTOでは無効
+    if(state.mode==="auto") return;
 
     const dir=e.deltaY>0?1:-1;
 
     state.index=Math.max(0,Math.min(state.lines.length-1,state.index+dir));
 
-    syncFromManual();
     render();
 
 },{passive:true});
 
-/* ================= MODE ================= */
-document.getElementById("modeBtn").onclick=()=>{
-    state.mode=state.mode==="auto"?"manual":"auto";
-    document.getElementById("modeBtn").textContent=state.mode.toUpperCase();
-};
-
-/* ================= BACK ================= */
+/* back */
 document.getElementById("backBtn").onclick=()=>{
 
     if(state.timer) clearInterval(state.timer);
     if(state.player) state.player.destroy();
 
-    state.timer=null;
-    state.player=null;
-    state.ready=false;
-    state.index=0;
-    state.offset=0;
-    state.mode="auto";
+    state={
+        player:null,
+        timer:null,
+        ready:false,
+        lines:[],
+        index:0,
+        offset:0,
+        mode:"auto"
+    };
 
     document.getElementById("lyricsWrap").innerHTML="";
     document.getElementById("playerWrap").innerHTML="";
@@ -388,7 +389,7 @@ document.getElementById("backBtn").onclick=()=>{
     showScreen("top");
 };
 
-/* ================= UTIL ================= */
+/* util */
 function getYoutubeId(url){
     const m=url.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([a-zA-Z0-9_-]{11})/);
     return m?m[1]:"";
