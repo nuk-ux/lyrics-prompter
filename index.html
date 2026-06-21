@@ -24,6 +24,7 @@ body{
     width:100%;
     font-size:22px;
     padding:12px;
+    box-sizing:border-box;
 }
 
 .result{
@@ -66,24 +67,27 @@ body{
     opacity:.35;
 }
 
-/* TOPボタン */
+/* =========================
+   TOP UI（ここが修正ポイント）
+========================= */
 .topbar{
     position:fixed;
     top:10px;
     left:10px;
     z-index:10000;
+
+    display:flex;
+    flex-direction:column; /* ★縦並び */
+    gap:8px;
 }
 
 /* モード表示 */
 #modeIndicator{
-    position:fixed;
-    top:10px;
-    right:10px;
     background:#111;
     border:1px solid #333;
     padding:6px 10px;
-    z-index:10000;
     cursor:pointer;
+    text-align:center;
     user-select:none;
 }
 
@@ -102,10 +106,11 @@ button{
     color:#fff;
     border:1px solid #333;
     padding:6px 10px;
+    cursor:pointer;
 }
 button:hover{background:#222;}
 
-/* warning */
+/* warn */
 #warn{
     position:fixed;
     top:0;
@@ -125,29 +130,32 @@ button:hover{background:#222;}
 
 <div id="warn"></div>
 
+<!-- TOP -->
 <div id="topScreen" class="screen active">
     <h1>Lyrics Prompter Laule'a</h1>
     <input id="search" placeholder="曲名 / アーティスト">
     <div id="results"></div>
 </div>
 
+<!-- PLAYER -->
 <div id="playerScreen" class="screen">
 
+    <!-- TOP + MODE（縦構造） -->
     <div class="topbar">
         <button id="backBtn">← TOP</button>
+        <div id="modeIndicator">AUTO</div>
     </div>
 
-    <div id="modeIndicator">AUTO</div>
-
     <div id="playerWrap"></div>
-
     <div id="lyricsWrap"></div>
 </div>
 
+<!-- controls -->
 <div id="controls"></div>
 
 <script>
 
+/* ================= STATE ================= */
 const state = {
     player:null,
     timer:null,
@@ -155,8 +163,7 @@ const state = {
     lines:[],
     index:0,
     offset:0,
-    mode:"auto",
-    scrollLock:false
+    mode:"auto"
 };
 
 /* ================= WARN ================= */
@@ -296,19 +303,14 @@ function buildPlayer(){
 
 /* ================= TIME ================= */
 function getTime(){
-    if(!state.player) return 0;
     return state.player.getCurrentTime() + state.offset;
 }
 
-/* ================= MANUAL SYNC ================= */
+/* ================= SYNC ================= */
 function syncFromManual(){
-    if(!state.player) return;
-
     const t=state.player.getCurrentTime();
     const lt=state.lines[state.index]?.time;
-
     if(lt==null) return;
-
     state.offset=lt-t;
 }
 
@@ -335,14 +337,12 @@ function buildControls(){
 
 /* ================= SCROLL ================= */
 function scroll(d){
-
     state.index=Math.max(0,Math.min(state.lines.length-1,state.index+d));
-
     syncFromManual();
     render();
 }
 
-/* ================= SYNC LOOP ================= */
+/* ================= LOOP ================= */
 function startSync(){
 
     if(state.timer) clearInterval(state.timer);
@@ -359,9 +359,7 @@ function startSync(){
         if(state.mode==="auto"){
 
             for(let i=0;i<state.lines.length;i++){
-
                 const next=state.lines[i+1];
-
                 if(!next||next.time>t){
                     state.index=i;
                     render();
@@ -370,7 +368,7 @@ function startSync(){
             }
         }
 
-    },100);
+    },120);
 }
 
 /* ================= RENDER ================= */
@@ -380,7 +378,6 @@ function render(){
     wrap.innerHTML="";
 
     state.lines.forEach((l,i)=>{
-
         const d=document.createElement("div");
         d.className="line";
 
@@ -397,21 +394,7 @@ function render(){
     }
 }
 
-/* ================= WHEEL SCROLL（追加） ================= */
-document.getElementById("lyricsWrap").addEventListener("wheel",(e)=>{
-
-    e.preventDefault();
-
-    const dir=e.deltaY>0?1:-1;
-
-    state.index=Math.max(0,Math.min(state.lines.length-1,state.index+dir));
-
-    syncFromManual();
-    render();
-
-},{passive:false});
-
-/* ================= MODE UI ================= */
+/* ================= MODE ================= */
 const modeEl=document.getElementById("modeIndicator");
 
 modeEl.onclick=()=>{
@@ -423,7 +406,6 @@ modeEl.onclick=()=>{
 document.getElementById("backBtn").onclick=()=>{
 
     if(state.timer) clearInterval(state.timer);
-
     if(state.player) state.player.destroy();
 
     state.timer=null;
